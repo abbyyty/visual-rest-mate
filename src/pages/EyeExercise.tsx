@@ -21,6 +21,7 @@ interface PhaseConfig {
   showDot: boolean;
 }
 
+// Sequence starts with countdown only once, then loops from index 1 (close_eyes before vertical)
 const EXERCISE_SEQUENCE: PhaseConfig[] = [
   { type: 'countdown', duration: 5, instruction: 'Exercise starts in', showDot: false },
   { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
@@ -35,6 +36,9 @@ const EXERCISE_SEQUENCE: PhaseConfig[] = [
   { type: 'diagonal2', duration: 20, instruction: 'Follow the dot - Diagonal ↙', showDot: true },
   { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
 ];
+
+// Loop start index - after initial countdown, loop from here (skips countdown)
+const LOOP_START_INDEX = 1;
 
 const EyeExercise = () => {
   const navigate = useNavigate();
@@ -67,8 +71,6 @@ const EyeExercise = () => {
 
   // Dot animation based on phase type
   const animateDot = useCallback((type: ExercisePhase, elapsed: number, duration: number) => {
-    const progress = elapsed / duration;
-    
     switch (type) {
       case 'vertical': {
         // Move up and down (1s per pass = 20 passes in 20s)
@@ -80,7 +82,8 @@ const EyeExercise = () => {
         break;
       }
       case 'horizontal': {
-        const cycleProgress = (elapsed % 2) / 2;
+        // 1.5s per pass (left→right→left = 3s full cycle)
+        const cycleProgress = (elapsed % 3) / 3;
         const x = cycleProgress < 0.5 
           ? 15 + (cycleProgress * 2) * 70 
           : 85 - ((cycleProgress - 0.5) * 2) * 70;
@@ -88,9 +91,10 @@ const EyeExercise = () => {
         break;
       }
       case 'circular': {
-        // 2s per circle = 10 circles in 20s
+        // 2s per circle = 10 circles in 20s - PERFECT CIRCLE using equal radius
         const angle = (elapsed / 2) * Math.PI * 2;
-        const radius = 25; // percentage
+        // Use 22% for both X and Y to create a perfect circle
+        const radius = 22;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
         setDotPosition({ x, y });
@@ -132,15 +136,16 @@ const EyeExercise = () => {
         const newTime = prev + 0.05;
         
         if (newTime >= currentPhase.duration) {
-          // Move to next phase
-          const nextIndex = (currentPhaseIndex + 1) % EXERCISE_SEQUENCE.length;
+          // Move to next phase - loop from LOOP_START_INDEX after reaching end (skip countdown on loop)
+          let nextIndex = currentPhaseIndex + 1;
+          if (nextIndex >= EXERCISE_SEQUENCE.length) {
+            nextIndex = LOOP_START_INDEX; // Loop back to close_eyes before vertical (skip countdown)
+          }
           setCurrentPhaseIndex(nextIndex);
           
           // Play appropriate sound
           const nextPhase = EXERCISE_SEQUENCE[nextIndex];
-          if (nextPhase.type === 'countdown') {
-            playStartSound();
-          } else if (nextPhase.showDot && currentPhase.type === 'close_eyes') {
+          if (nextPhase.showDot && currentPhase.type === 'close_eyes') {
             playOpenEyesSound();
           }
           

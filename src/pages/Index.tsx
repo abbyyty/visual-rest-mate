@@ -6,8 +6,7 @@ import { useDailyStats } from '@/hooks/useDailyStats';
 import { StatCard } from '@/components/StatCard';
 import { BreakPopup } from '@/components/BreakPopup';
 import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
-
-const BREAK_INTERVAL = 30 * 60; // 30 minutes in seconds
+import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,10 +25,12 @@ const Index = () => {
     setSessionTime(0);
     sessionStartRef.current = Date.now();
     
+    const breakIntervalSeconds = getBreakInterval() * 60;
+    
     timerRef.current = setInterval(() => {
       setSessionTime((prev) => {
         const newTime = prev + 1;
-        if (newTime > 0 && newTime % BREAK_INTERVAL === 0) {
+        if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
           setShowBreakPopup(true);
         }
         return newTime;
@@ -109,6 +110,8 @@ const Index = () => {
             </div>
             
             <div className="flex items-center justify-center gap-6">
+              <SettingsModal />
+              
               <button
                 onClick={handleStart}
                 disabled={isRunning}
@@ -130,7 +133,7 @@ const Index = () => {
             
             {isRunning && (
               <p className="text-muted-foreground animate-pulse-glow">
-                Timer running... Break reminder in {Math.floor((BREAK_INTERVAL - (sessionTime % BREAK_INTERVAL)) / 60)} minutes
+                Timer running... Break reminder in {Math.floor((getBreakInterval() * 60 - (sessionTime % (getBreakInterval() * 60))) / 60)} minutes
               </p>
             )}
           </section>
