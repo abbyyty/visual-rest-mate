@@ -94,28 +94,27 @@ export function useDailyStats() {
 
       if (error) throw error;
 
-      if (data) {
-        const next: DailyStats = {
-          ...data,
-          early_end_count: data.early_end_count ?? 0,
-          overuse_time_seconds: data.overuse_time_seconds ?? 0,
-        };
-        statsRef.current = next;
-        setStats(next);
-      } else {
-        const next: DailyStats = {
-          user_id: userId,
-          date: today,
-          total_screen_time_seconds: 0,
-          exercise_count: 0,
-          close_eyes_count: 0,
-          skip_count: 0,
-          early_end_count: 0,
-          overuse_time_seconds: 0,
-        };
-        statsRef.current = next;
-        setStats(next);
-      }
+      const next: DailyStats = data
+        ? {
+            ...data,
+            early_end_count: data.early_end_count ?? 0,
+            overuse_time_seconds: data.overuse_time_seconds ?? 0,
+          }
+        : {
+            user_id: userId,
+            date: today,
+            total_screen_time_seconds: 0,
+            exercise_count: 0,
+            close_eyes_count: 0,
+            skip_count: 0,
+            early_end_count: 0,
+            overuse_time_seconds: 0,
+          };
+
+      // Sync local + shared latest snapshot (but do NOT trigger a write just from fetching)
+      statsRef.current = next;
+      setStats(next);
+      getStatsWriteCoordinator(`${userId}:${today}`).latest = next;
     } catch (error) {
       devError('Error fetching stats:', error);
       const next: DailyStats = {
@@ -130,6 +129,7 @@ export function useDailyStats() {
       };
       statsRef.current = next;
       setStats(next);
+      getStatsWriteCoordinator(`${userId}:${today}`).latest = next;
     } finally {
       setLoading(false);
     }
@@ -155,7 +155,14 @@ export function useDailyStats() {
 
   const updateStats = useCallback(
     (updates: StatsUpdate) => {
-      const base = statsRef.current ?? getDefaultStats();
+      const key = `${userId}:${today}`;
+
+      // CRITICAL: Always base updates on the shared "latest" snapshot so that
+      // updates from other pages (Index/EyeExercise/Relax) don't get overwritten
+      // by stale local state.
+      const sharedLatest = getStatsWriteCoordinator(key).latest;
+      const base = sharedLatest ?? statsRef.current ?? getDefaultStats();
+
       const patch = typeof updates === 'function' ? updates(base) : updates;
 
       const next: DailyStats = {
@@ -170,7 +177,7 @@ export function useDailyStats() {
       setStats(next);
 
       // Persist safely (coalesced + serialized across pages)
-      requestStatsWrite(`${userId}:${today}`, next);
+      requestStatsWrite(key, next);
     },
     [userId, today, getDefaultStats]
   );
