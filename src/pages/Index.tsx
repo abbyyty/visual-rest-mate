@@ -95,10 +95,12 @@ const Index = () => {
     };
   }, []);
 
-  // Today's total is from Supabase (accumulated sessions)
-  const todaysTotalTime = stats?.total_screen_time_seconds ?? 0;
+  // Today's total base from Supabase (accumulated sessions)
+  const todaysTotalBase = stats?.total_screen_time_seconds ?? 0;
+  // Live today's total = base + current session time
+  const todaysTotalLive = todaysTotalBase + (isRunning ? currentSessionTime : 0);
   const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
-  const totalHours = Math.floor(todaysTotalTime / 3600);
+  const totalHours = Math.floor(todaysTotalLive / 3600);
   const emergencyStops = stats?.emergency_stop_count ?? 0;
 
   return (
@@ -126,11 +128,11 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Today's Total Timer (Small, Light) */}
+            {/* Today's Total Timer (Small, Light) - LIVE */}
             <div className="space-y-1">
               <h3 className="text-muted-foreground text-sm">Today's Total</h3>
               <div className="text-2xl font-mono text-muted-foreground">
-                {formatTime(todaysTotalTime)}
+                {formatTime(todaysTotalLive)}
               </div>
             </div>
             
@@ -215,6 +217,7 @@ const Index = () => {
       {/* Break Popup */}
       <BreakPopup
         open={showBreakPopup}
+        intervalMinutes={getBreakInterval()}
         onEyeExercise={handleEyeExercise}
         onCloseEyes={handleCloseEyes}
         onSkip={handleSkip}
