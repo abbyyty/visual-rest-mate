@@ -1,20 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { formatMinutesSeconds } from '@/lib/userId';
 import { playEndSound } from '@/lib/sound';
+import { toast } from 'sonner';
 
 interface BlackScreenOverlayProps {
   open: boolean;
   onClose: () => void;
+  onEarlyEnd?: () => void;
   duration?: number; // in seconds, default 300 (5 minutes)
 }
 
-export function BlackScreenOverlay({ open, onClose, duration = 300 }: BlackScreenOverlayProps) {
+export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }: BlackScreenOverlayProps) {
   const [timeRemaining, setTimeRemaining] = useState(duration);
 
   const handleEnd = useCallback(() => {
     playEndSound();
     onClose();
   }, [onClose]);
+
+  const handleEarlyEnd = useCallback(() => {
+    if (onEarlyEnd) {
+      onEarlyEnd();
+      toast.success('Early end recorded');
+    }
+    onClose();
+  }, [onClose, onEarlyEnd]);
 
   useEffect(() => {
     if (!open) {
@@ -51,10 +61,10 @@ export function BlackScreenOverlay({ open, onClose, duration = 300 }: BlackScree
         </div>
         
         <button
-          onClick={onClose}
+          onClick={handleEarlyEnd}
           className="btn-secondary px-12"
         >
-          End Early
+          Early End
         </button>
       </div>
     </div>

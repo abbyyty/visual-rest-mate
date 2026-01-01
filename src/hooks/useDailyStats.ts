@@ -10,7 +10,7 @@ export interface DailyStats {
   exercise_count: number;
   close_eyes_count: number;
   skip_count: number;
-  emergency_stop_count: number;
+  early_end_count: number;
 }
 
 export function useDailyStats() {
@@ -34,7 +34,7 @@ export function useDailyStats() {
       if (data) {
         setStats({
           ...data,
-          emergency_stop_count: data.emergency_stop_count ?? 0,
+          early_end_count: data.early_end_count ?? 0,
         });
       } else {
         setStats({
@@ -44,7 +44,7 @@ export function useDailyStats() {
           exercise_count: 0,
           close_eyes_count: 0,
           skip_count: 0,
-          emergency_stop_count: 0,
+          early_end_count: 0,
         });
       }
     } catch (error) {
@@ -56,7 +56,7 @@ export function useDailyStats() {
         exercise_count: 0,
         close_eyes_count: 0,
         skip_count: 0,
-        emergency_stop_count: 0,
+        early_end_count: 0,
       });
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ export function useDailyStats() {
       exercise_count: stats?.exercise_count ?? 0,
       close_eyes_count: stats?.close_eyes_count ?? 0,
       skip_count: stats?.skip_count ?? 0,
-      emergency_stop_count: stats?.emergency_stop_count ?? 0,
+      early_end_count: stats?.early_end_count ?? 0,
       ...updates,
     };
 
@@ -104,8 +104,8 @@ export function useDailyStats() {
     updateStats({ total_screen_time_seconds: (stats?.total_screen_time_seconds ?? 0) + seconds });
   }, [updateStats, stats]);
 
-  const incrementEmergencyStopCount = useCallback(() => {
-    updateStats({ emergency_stop_count: (stats?.emergency_stop_count ?? 0) + 1 });
+  const incrementEarlyEndCount = useCallback(() => {
+    updateStats({ early_end_count: (stats?.early_end_count ?? 0) + 1 });
   }, [updateStats, stats]);
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function useDailyStats() {
     incrementCloseEyesCount,
     incrementSkipCount,
     addScreenTime,
-    incrementEmergencyStopCount,
+    incrementEarlyEndCount,
     refetch: fetchStats,
   };
 }
