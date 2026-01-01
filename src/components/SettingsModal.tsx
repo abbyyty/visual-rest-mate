@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Bell, BellOff } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS } from '@/lib/settings';
-import { getNotificationPermissionStatus, requestNotificationPermission } from '@/lib/notifications';
 
 type SpeedValue = 'slow' | 'normal' | 'fast';
 const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
@@ -52,23 +51,16 @@ function SpeedSlider({
 export function SettingsModal() {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
-  const [notificationStatus, setNotificationStatus] = useState<string>('default');
 
   useEffect(() => {
     if (open) {
       setSettings(getUserSettings());
-      setNotificationStatus(getNotificationPermissionStatus());
     }
   }, [open]);
 
   const handleSave = () => {
     saveUserSettings(settings);
     setOpen(false);
-  };
-
-  const handleNotificationToggle = async () => {
-    const granted = await requestNotificationPermission();
-    setNotificationStatus(granted ? 'granted' : 'denied');
   };
 
   const updateSpeed = (exercise: keyof UserSettings['speeds'], value: SpeedValue) => {
@@ -155,39 +147,6 @@ export function SettingsModal() {
                 value={settings.speeds.diagonal2}
                 onChange={(v) => updateSpeed('diagonal2', v)}
               />
-            </div>
-          </section>
-
-          {/* Notifications */}
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Notifications
-            </h3>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/30">
-              <div className="flex items-center gap-3">
-                {notificationStatus === 'granted' ? (
-                  <Bell className="w-5 h-5 text-success" />
-                ) : (
-                  <BellOff className="w-5 h-5 text-muted-foreground" />
-                )}
-                <div>
-                  <p className="text-sm text-foreground">Background reminders</p>
-                  <p className="text-xs text-muted-foreground">
-                    {notificationStatus === 'granted' ? 'Enabled' : 
-                     notificationStatus === 'denied' ? 'Blocked' : 
-                     notificationStatus === 'unsupported' ? 'Not supported' : 'Not enabled'}
-                  </p>
-                </div>
-              </div>
-              {notificationStatus !== 'granted' && notificationStatus !== 'unsupported' && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleNotificationToggle}
-                >
-                  Enable
-                </Button>
-              )}
             </div>
           </section>
 

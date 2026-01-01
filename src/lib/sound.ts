@@ -30,6 +30,12 @@ export function playBeep(frequency: number = 800, duration: number = 150): void 
   }
 }
 
+// Ding ding sound for break reminders (2 beeps at 800Hz, 300ms apart)
+export function playDingDing(): void {
+  playBeep(800, 200);
+  setTimeout(() => playBeep(800, 200), 300);
+}
+
 export function playStartSound(): void {
   playBeep(600, 200);
 }

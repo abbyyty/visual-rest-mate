@@ -22,6 +22,7 @@ export type Database = {
           early_end_count: number
           exercise_count: number
           id: string
+          overuse_time_seconds: number
           skip_count: number
           total_screen_time_seconds: number
           updated_at: string
@@ -34,6 +35,7 @@ export type Database = {
           early_end_count?: number
           exercise_count?: number
           id?: string
+          overuse_time_seconds?: number
           skip_count?: number
           total_screen_time_seconds?: number
           updated_at?: string
@@ -46,6 +48,7 @@ export type Database = {
           early_end_count?: number
           exercise_count?: number
           id?: string
+          overuse_time_seconds?: number
           skip_count?: number
           total_screen_time_seconds?: number
           updated_at?: string
