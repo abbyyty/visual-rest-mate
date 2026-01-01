@@ -71,6 +71,19 @@ function requestStatsWrite(key: string, next: DailyStats) {
   void flushStatsWrite(key);
 }
 
+async function waitForStatsFlush(key: string) {
+  const coord = getStatsWriteCoordinator(key);
+
+  // Wait until there is no in-flight request and nothing queued.
+  // (We "poke" flushStatsWrite in case something queued while another page was active.)
+  while (coord.inFlight || coord.needsFlush) {
+    await flushStatsWrite(key);
+    // If flushStatsWrite returned immediately because something was in-flight,
+    // give the event loop time and check again.
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 
 export function useDailyStats() {
   const [stats, setStats] = useState<DailyStats | null>(null);
@@ -84,6 +97,8 @@ export function useDailyStats() {
   const today = getTodayDate();
 
   const fetchStats = useCallback(async () => {
+    const key = `${userId}:${today}`;
+
     try {
       const { data, error } = await supabase
         .from('daily_stats')
@@ -94,7 +109,7 @@ export function useDailyStats() {
 
       if (error) throw error;
 
-      const next: DailyStats = data
+      const fetched: DailyStats = data
         ? {
             ...data,
             early_end_count: data.early_end_count ?? 0,
@@ -111,13 +126,21 @@ export function useDailyStats() {
             overuse_time_seconds: 0,
           };
 
-      // Sync local + shared latest snapshot (but do NOT trigger a write just from fetching)
-      statsRef.current = next;
-      setStats(next);
-      getStatsWriteCoordinator(`${userId}:${today}`).latest = next;
+      // IMPORTANT: Never let a fast fetch overwrite a newer in-flight/pending local update
+      // (common when navigating between pages immediately after triggering an update).
+      const coord = getStatsWriteCoordinator(key);
+      const effective =
+        coord.latest && (coord.needsFlush || coord.inFlight) ? coord.latest : fetched;
+
+      statsRef.current = effective;
+      setStats(effective);
+
+      if (!coord.latest || (!coord.needsFlush && !coord.inFlight)) {
+        coord.latest = effective;
+      }
     } catch (error) {
       devError('Error fetching stats:', error);
-      const next: DailyStats = {
+      const fallback: DailyStats = {
         user_id: userId,
         date: today,
         total_screen_time_seconds: 0,
@@ -127,9 +150,17 @@ export function useDailyStats() {
         early_end_count: 0,
         overuse_time_seconds: 0,
       };
-      statsRef.current = next;
-      setStats(next);
-      getStatsWriteCoordinator(`${userId}:${today}`).latest = next;
+
+      const coord = getStatsWriteCoordinator(key);
+      const effective =
+        coord.latest && (coord.needsFlush || coord.inFlight) ? coord.latest : fallback;
+
+      statsRef.current = effective;
+      setStats(effective);
+
+      if (!coord.latest || (!coord.needsFlush && !coord.inFlight)) {
+        coord.latest = effective;
+      }
     } finally {
       setLoading(false);
     }
@@ -182,6 +213,11 @@ export function useDailyStats() {
     [userId, today, getDefaultStats]
   );
 
+  const flush = useCallback(() => {
+    const key = `${userId}:${today}`;
+    return waitForStatsFlush(key);
+  }, [userId, today]);
+
   const incrementExerciseCount = useCallback(() => {
     updateStats((s) => ({ exercise_count: s.exercise_count + 1 }));
   }, [updateStats]);
@@ -227,6 +263,7 @@ export function useDailyStats() {
     addScreenTime,
     incrementEarlyEndCount,
     addOveruseTime,
+    flush,
     refetch: fetchStats,
   };
 }

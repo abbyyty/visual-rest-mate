@@ -61,7 +61,7 @@ const buildExerciseSequence = (): PhaseConfig[] => {
 
 const EyeExercise = () => {
   const navigate = useNavigate();
-  const { incrementEarlyEndCount } = useDailyStats();
+  const { incrementEarlyEndCount, flush } = useDailyStats();
   
   const [exerciseSequence, setExerciseSequence] = useState<PhaseConfig[]>([]);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -89,12 +89,17 @@ const EyeExercise = () => {
     }
   }, []);
 
-  const handleEarlyEnd = useCallback(() => {
+  const handleEarlyEnd = useCallback(async () => {
     stopAllTimers();
+
+    // Ensure the early-end increment is persisted before we navigate away,
+    // otherwise a fast refetch on the next page can overwrite it.
     incrementEarlyEndCount();
+    await flush();
+
     toast.info('Early end recorded');
     navigate('/', { state: { fromExercise: true, earlyEnd: true } });
-  }, [stopAllTimers, incrementEarlyEndCount, navigate]);
+  }, [stopAllTimers, incrementEarlyEndCount, flush, navigate]);
 
   // Auto-navigate after completion with encouragement
   useEffect(() => {
