@@ -45,7 +45,7 @@ export function BreakPopup({
             ⏰ Time for a Break!
           </DialogTitle>
           <DialogDescription className="text-center text-lg">
-            You've been working for {formatWorkedTime(workedSeconds)}. Take a {intervalMinutes} {minuteText} break to rest your eyes.
+            You've been working for {formatWorkedTime(workedSeconds)}. Take a break to rest your eyes.
           </DialogDescription>
         </DialogHeader>
         
