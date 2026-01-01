@@ -15,6 +15,63 @@ export interface DailyStats {
   overuse_time_seconds: number;
 }
 
+type StatsWriteCoordinator = {
+  inFlight: boolean;
+  needsFlush: boolean;
+  latest: DailyStats | null;
+};
+
+// Shared across all hook instances to avoid write races between pages (Index/EyeExercise/etc.).
+const statsWriteCoordinators = new Map<string, StatsWriteCoordinator>();
+
+function getStatsWriteCoordinator(key: string): StatsWriteCoordinator {
+  const existing = statsWriteCoordinators.get(key);
+  if (existing) return existing;
+
+  const created: StatsWriteCoordinator = {
+    inFlight: false,
+    needsFlush: false,
+    latest: null,
+  };
+  statsWriteCoordinators.set(key, created);
+  return created;
+}
+
+async function flushStatsWrite(key: string) {
+  const coord = getStatsWriteCoordinator(key);
+  if (coord.inFlight) return;
+
+  coord.inFlight = true;
+  try {
+    while (coord.needsFlush) {
+      coord.needsFlush = false;
+      const payload = coord.latest;
+      if (!payload) continue;
+
+      const { error } = await supabase
+        .from('daily_stats')
+        .upsert(payload, { onConflict: 'user_id,date' });
+
+      if (error) devError('Error updating stats:', error);
+    }
+  } finally {
+    coord.inFlight = false;
+
+    // If something queued up during the last await, flush again.
+    if (coord.needsFlush) {
+      void flushStatsWrite(key);
+    }
+  }
+}
+
+function requestStatsWrite(key: string, next: DailyStats) {
+  const coord = getStatsWriteCoordinator(key);
+  coord.latest = next;
+  coord.needsFlush = true;
+  void flushStatsWrite(key);
+}
+
+
 export function useDailyStats() {
   const [stats, setStats] = useState<DailyStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,13 +169,8 @@ export function useDailyStats() {
       statsRef.current = next;
       setStats(next);
 
-      // Persist (fire-and-forget)
-      void supabase
-        .from('daily_stats')
-        .upsert(next, { onConflict: 'user_id,date' })
-        .then(({ error }) => {
-          if (error) devError('Error updating stats:', error);
-        });
+      // Persist safely (coalesced + serialized across pages)
+      requestStatsWrite(`${userId}:${today}`, next);
     },
     [userId, today, getDefaultStats]
   );
