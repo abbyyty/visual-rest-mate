@@ -10,6 +10,7 @@ import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
 import { playDingDing } from '@/lib/sound';
 import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { devLog, devWarn, devError } from '@/lib/logger';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -41,10 +42,10 @@ const Index = () => {
   
   // Cleanup on unmount
   useEffect(() => {
-    console.log('🔧 Index component mounted');
+    devLog('🔧 Index component mounted');
     isMountedRef.current = true;
     return () => {
-      console.log('🔧 Index component unmounting, cleaning up timer');
+      devLog('🔧 Index component unmounting, cleaning up timer');
       isMountedRef.current = false;
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -56,7 +57,7 @@ const Index = () => {
   // Cleanup timer when isRunning becomes false
   useEffect(() => {
     if (!isRunning && timerRef.current) {
-      console.log('🧹 isRunning is false, cleaning up timer');
+      devLog('🧹 isRunning is false, cleaning up timer');
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
@@ -64,11 +65,11 @@ const Index = () => {
 
   const handleStart = useCallback(() => {
     try {
-      console.log('🚀 START clicked!');
+      devLog('🚀 START clicked!');
 
       // If paused, resume from current time
       if (isPaused) {
-        console.log('▶️ Resuming from paused state');
+        devLog('▶️ Resuming from paused state');
         setIsPaused(false);
         setIsRunning(true);
         
@@ -87,11 +88,11 @@ const Index = () => {
             const newTime = prev + 1;
 
             if (newTime % 10 === 0) {
-              console.log(`⏱️ Timer: ${formatTime(newTime)}`);
+              devLog(`⏱️ Timer: ${formatTime(newTime)}`);
             }
 
             if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
-              console.log(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
+              devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
               playDingDing();
               
               const timeSinceLastDing = lastDingTimeRef.current > 0 
@@ -99,7 +100,7 @@ const Index = () => {
                 : 0;
               
               if (timeSinceLastDing > 0) {
-                console.log(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
+                devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
                 setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
               }
               
@@ -117,19 +118,19 @@ const Index = () => {
 
       // Prevent multiple starts
       if (isRunning) {
-        console.warn('⚠️ Timer already running, ignoring start request');
+        devWarn('⚠️ Timer already running, ignoring start request');
         return;
       }
 
       // Clear any existing timer first
       if (timerRef.current) {
-        console.log('🧹 Clearing existing timer before start');
+        devLog('🧹 Clearing existing timer before start');
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
 
       // Reset timer to 00:00:00
-      console.log('🔄 Resetting timer to 00:00:00');
+      devLog('🔄 Resetting timer to 00:00:00');
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
@@ -137,12 +138,12 @@ const Index = () => {
       setIsPaused(false);
       
       const breakIntervalSeconds = getBreakInterval() * 60;
-      console.log(`⏱️ Starting timer with break interval: ${breakIntervalSeconds} seconds`);
+      devLog(`⏱️ Starting timer with break interval: ${breakIntervalSeconds} seconds`);
 
       // Start the timer
       timerRef.current = setInterval(() => {
         if (!isMountedRef.current) {
-          console.warn('⚠️ Component unmounted, stopping timer');
+          devWarn('⚠️ Component unmounted, stopping timer');
           if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
@@ -155,12 +156,12 @@ const Index = () => {
 
           // Debug log every 10 seconds
           if (newTime % 10 === 0) {
-            console.log(`⏱️ Timer: ${formatTime(newTime)}`);
+            devLog(`⏱️ Timer: ${formatTime(newTime)}`);
           }
 
           // Check for break interval (ding ding every interval)
           if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
-            console.log(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
+            devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
             playDingDing();
             
             // Calculate overuse since last popup (or since start if first popup)
@@ -170,7 +171,7 @@ const Index = () => {
             
             // If user ignored previous reminder, that time is overuse
             if (timeSinceLastDing > 0) {
-              console.log(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
+              devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
               setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
             }
             
@@ -182,9 +183,9 @@ const Index = () => {
         });
       }, 1000);
       
-      console.log('✅ Timer started successfully');
+      devLog('✅ Timer started successfully');
     } catch (error) {
-      console.error('❌ Error in handleStart:', error);
+      devError('❌ Error in handleStart:', error);
       setIsRunning(false);
       setIsPaused(false);
       if (timerRef.current) {
@@ -220,56 +221,56 @@ const Index = () => {
 
   const handlePause = useCallback(() => {
     try {
-      console.log('⏸️ PAUSE clicked!');
+      devLog('⏸️ PAUSE clicked!');
       setIsRunning(false);
       setIsPaused(true);
 
       // Clear the timer but keep the time
       if (timerRef.current) {
-        console.log('🧹 Clearing timer interval (paused)');
+        devLog('🧹 Clearing timer interval (paused)');
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
 
-      console.log(`✅ Timer paused at ${formatTime(currentSessionTime)}`);
+      devLog(`✅ Timer paused at ${formatTime(currentSessionTime)}`);
       toast.info('Timer paused');
     } catch (error) {
-      console.error('❌ Error in handlePause:', error);
+      devError('❌ Error in handlePause:', error);
     }
   }, [currentSessionTime]);
 
   const handleReset = useCallback(() => {
     try {
-      console.log('🔄 RESET clicked!');
+      devLog('🔄 RESET clicked!');
       setIsRunning(false);
       setIsPaused(false);
 
       // Clear the timer
       if (timerRef.current) {
-        console.log('🧹 Clearing timer interval');
+        devLog('🧹 Clearing timer interval');
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
 
       // Save current session time before reset
       if (currentSessionTime > 0) {
-        console.log(`💾 Saving session time before reset: ${formatTime(currentSessionTime)}`);
+        devLog(`💾 Saving session time before reset: ${formatTime(currentSessionTime)}`);
         addScreenTime(currentSessionTime);
       }
       
       // Save accumulated session overuse to cumulative
       if (sessionOveruseSeconds > 0) {
-        console.log(`💾 Saving overuse time: ${formatTime(sessionOveruseSeconds)}`);
+        devLog(`💾 Saving overuse time: ${formatTime(sessionOveruseSeconds)}`);
         addOveruseTime(sessionOveruseSeconds);
       }
       
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
-      console.log('✅ Timer reset to 00:00:00');
+      devLog('✅ Timer reset to 00:00:00');
       toast.success('Timer reset');
     } catch (error) {
-      console.error('❌ Error in handleReset:', error);
+      devError('❌ Error in handleReset:', error);
       setIsRunning(false);
       setIsPaused(false);
       if (timerRef.current) {
@@ -287,7 +288,7 @@ const Index = () => {
     
     // Add time since last ding as session overuse
     if (timeSinceLastDing > 0 && lastDingTimeRef.current > 0) {
-      console.log(`🔥 Adding late response overuse: ${formatTime(timeSinceLastDing)}`);
+      devLog(`🔥 Adding late response overuse: ${formatTime(timeSinceLastDing)}`);
       setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
       return timeSinceLastDing;
     }
@@ -374,7 +375,7 @@ const Index = () => {
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
 
-    console.log('⏭️ Skip clicked - restarting timer from 0');
+    devLog('⏭️ Skip clicked - restarting timer from 0');
   }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
 
   const handleDirectExercise = useCallback(() => {
@@ -449,7 +450,7 @@ const Index = () => {
               
               <button
                 onClick={(e) => {
-                  console.log('🔘 START button onClick event fired');
+                  devLog('🔘 START button onClick event fired');
                   e.preventDefault();
                   e.stopPropagation();
                   handleStart();
@@ -464,7 +465,7 @@ const Index = () => {
               
               <button
                 onClick={(e) => {
-                  console.log('🔘 PAUSE button onClick event fired');
+                  devLog('🔘 PAUSE button onClick event fired');
                   e.preventDefault();
                   e.stopPropagation();
                   handlePause();
@@ -479,7 +480,7 @@ const Index = () => {
               
               <button
                 onClick={(e) => {
-                  console.log('🔘 RESET button onClick event fired');
+                  devLog('🔘 RESET button onClick event fired');
                   e.preventDefault();
                   e.stopPropagation();
                   handleReset();

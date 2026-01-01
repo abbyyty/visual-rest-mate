@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserId, getTodayDate } from '@/lib/userId';
+import { devError } from '@/lib/logger';
 
 export interface DailyStats {
   id?: string;
@@ -51,7 +52,7 @@ export function useDailyStats() {
         });
       }
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      devError('Error fetching stats:', error);
       setStats({
         user_id: userId,
         date: today,
@@ -104,7 +105,7 @@ export function useDailyStats() {
           .from('daily_stats')
           .upsert(next, { onConflict: 'user_id,date' })
           .then(({ error }) => {
-            if (error) console.error('Error updating stats:', error);
+            if (error) devError('Error updating stats:', error);
           });
 
         return next;
