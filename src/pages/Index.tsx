@@ -196,18 +196,24 @@ const Index = () => {
 
   // Handle auto-start from exercise/relax navigation
   useEffect(() => {
-    const state = location.state as { fromExercise?: boolean; fromRelax?: boolean } | null;
-    
+    const state = location.state as {
+      fromExercise?: boolean;
+      fromRelax?: boolean;
+      earlyEnd?: boolean;
+    } | null;
+
     if ((state?.fromExercise || state?.fromRelax) && !autoStartTriggeredRef.current && !isRunning) {
       autoStartTriggeredRef.current = true;
-      
+
       // Clear the navigation state to prevent re-triggering
       navigate('/', { replace: true, state: {} });
-      
+
       // Auto-start timer after a short delay
       setTimeout(() => {
         handleStart();
-        toast.success('✅ Timer resumed - stay productive!');
+        if (!state?.earlyEnd) {
+          toast.success('✅ Timer resumed - stay productive!');
+        }
       }, 1000);
     }
   }, [location.state, isRunning, navigate, handleStart]);
@@ -351,22 +357,25 @@ const Index = () => {
   const handleSkip = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
-    
-    // Save session overuse to cumulative on skip
+
+    // Persist this session immediately (no RESET required)
+    if (currentSessionTime > 0) {
+      addScreenTime(currentSessionTime);
+    }
     if (totalSessionOveruse > 0) {
       addOveruseTime(totalSessionOveruse);
     }
-    
+
     setShowBreakPopup(false);
     incrementSkipCount();
-    
+
     // Immediately restart current session timer from 0
     setCurrentSessionTime(0);
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
-    
+
     console.log('⏭️ Skip clicked - restarting timer from 0');
-  }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime]);
+  }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
 
   const handleDirectExercise = useCallback(() => {
     incrementExerciseCount();
@@ -375,15 +384,19 @@ const Index = () => {
 
   // Today's total base from Supabase (accumulated sessions)
   const todaysTotalBase = stats?.total_screen_time_seconds ?? 0;
-  // Live today's total = base + current session time
-  const todaysTotalLive = todaysTotalBase + (isRunning ? currentSessionTime : 0);
+  // Live today's total = base + current session time (running or paused)
+  const todaysTotalLive = todaysTotalBase + ((isRunning || isPaused) ? currentSessionTime : 0);
   const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
   const totalHours = Math.floor(todaysTotalLive / 3600);
   const earlyEnds = stats?.early_end_count ?? 0;
   // Cumulative daily overuse from Supabase (not including current session yet)
   const cumulativeOveruseSeconds = stats?.overuse_time_seconds ?? 0;
   // Current session overuse for popup display
-  const currentSessionOveruse = sessionOveruseSeconds + (lastDingTimeRef.current > 0 ? currentSessionTime - lastDingTimeRef.current : 0);
+  const currentSessionOveruse =
+    sessionOveruseSeconds +
+    (lastDingTimeRef.current > 0
+      ? Math.max(0, currentSessionTime - lastDingTimeRef.current)
+      : 0);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -549,6 +562,7 @@ const Index = () => {
       <BreakPopup 
         open={showBreakPopup} 
         intervalMinutes={getBreakInterval()} 
+        workedSeconds={currentSessionTime}
         overuseSeconds={currentSessionOveruse > 0 ? currentSessionOveruse : 0}
         onEyeExercise={handleEyeExercise} 
         onCloseEyes={handleCloseEyes} 
