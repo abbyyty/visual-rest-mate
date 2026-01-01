@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame } from 'lucide-react';
+import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame, Pause, RotateCcw, Info } from 'lucide-react';
 import { getTodayDate, formatTime } from '@/lib/userId';
 import { useDailyStats } from '@/hooks/useDailyStats';
 import { StatCard } from '@/components/StatCard';
@@ -9,6 +9,7 @@ import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
 import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
 import { playDingDing } from '@/lib/sound';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ const Index = () => {
   } = useDailyStats();
   
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
   const [showBreakPopup, setShowBreakPopup] = useState(false);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
@@ -64,6 +66,55 @@ const Index = () => {
     try {
       console.log('🚀 START clicked!');
 
+      // If paused, resume from current time
+      if (isPaused) {
+        console.log('▶️ Resuming from paused state');
+        setIsPaused(false);
+        setIsRunning(true);
+        
+        const breakIntervalSeconds = getBreakInterval() * 60;
+        
+        timerRef.current = setInterval(() => {
+          if (!isMountedRef.current) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            return;
+          }
+          
+          setCurrentSessionTime(prev => {
+            const newTime = prev + 1;
+
+            if (newTime % 10 === 0) {
+              console.log(`⏱️ Timer: ${formatTime(newTime)}`);
+            }
+
+            if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
+              console.log(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
+              playDingDing();
+              
+              const timeSinceLastDing = lastDingTimeRef.current > 0 
+                ? newTime - lastDingTimeRef.current 
+                : 0;
+              
+              if (timeSinceLastDing > 0) {
+                console.log(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
+                setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
+              }
+              
+              lastDingTimeRef.current = newTime;
+              setShowBreakPopup(true);
+            }
+            
+            return newTime;
+          });
+        }, 1000);
+        
+        toast.success('Timer resumed');
+        return;
+      }
+
       // Prevent multiple starts
       if (isRunning) {
         console.warn('⚠️ Timer already running, ignoring start request');
@@ -83,6 +134,7 @@ const Index = () => {
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
       setIsRunning(true);
+      setIsPaused(false);
       
       const breakIntervalSeconds = getBreakInterval() * 60;
       console.log(`⏱️ Starting timer with break interval: ${breakIntervalSeconds} seconds`);
@@ -134,12 +186,13 @@ const Index = () => {
     } catch (error) {
       console.error('❌ Error in handleStart:', error);
       setIsRunning(false);
+      setIsPaused(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     }
-  }, [isRunning]);
+  }, [isRunning, isPaused]);
 
   // Handle auto-start from exercise/relax navigation
   useEffect(() => {
@@ -159,10 +212,31 @@ const Index = () => {
     }
   }, [location.state, isRunning, navigate, handleStart]);
 
-  const handleStop = useCallback(() => {
+  const handlePause = useCallback(() => {
     try {
-      console.log('🛑 STOP clicked!');
+      console.log('⏸️ PAUSE clicked!');
       setIsRunning(false);
+      setIsPaused(true);
+
+      // Clear the timer but keep the time
+      if (timerRef.current) {
+        console.log('🧹 Clearing timer interval (paused)');
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      console.log(`✅ Timer paused at ${formatTime(currentSessionTime)}`);
+      toast.info('Timer paused');
+    } catch (error) {
+      console.error('❌ Error in handlePause:', error);
+    }
+  }, [currentSessionTime]);
+
+  const handleReset = useCallback(() => {
+    try {
+      console.log('🔄 RESET clicked!');
+      setIsRunning(false);
+      setIsPaused(false);
 
       // Clear the timer
       if (timerRef.current) {
@@ -171,14 +245,11 @@ const Index = () => {
         timerRef.current = null;
       }
 
-      // Add current session to today's total and save overuse
-      setCurrentSessionTime(prev => {
-        if (prev > 0) {
-          console.log(`💾 Saving session time: ${formatTime(prev)}`);
-          addScreenTime(prev);
-        }
-        return 0;
-      });
+      // Save current session time before reset
+      if (currentSessionTime > 0) {
+        console.log(`💾 Saving session time before reset: ${formatTime(currentSessionTime)}`);
+        addScreenTime(currentSessionTime);
+      }
       
       // Save accumulated session overuse to cumulative
       if (sessionOveruseSeconds > 0) {
@@ -186,12 +257,15 @@ const Index = () => {
         addOveruseTime(sessionOveruseSeconds);
       }
       
+      setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
-      console.log('✅ Timer stopped and reset to 00:00:00');
+      console.log('✅ Timer reset to 00:00:00');
+      toast.success('Timer reset');
     } catch (error) {
-      console.error('❌ Error in handleStop:', error);
+      console.error('❌ Error in handleReset:', error);
       setIsRunning(false);
+      setIsPaused(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -199,7 +273,7 @@ const Index = () => {
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
     }
-  }, [addScreenTime, addOveruseTime, sessionOveruseSeconds]);
+  }, [addScreenTime, addOveruseTime, sessionOveruseSeconds, currentSessionTime]);
 
   // Calculate session overuse when user clicks (time since last ding)
   const calculateSessionOveruse = useCallback(() => {
@@ -372,28 +446,49 @@ const Index = () => {
                 type="button"
               >
                 <Play className="w-6 h-6" />
-                {isRunning ? 'Running...' : 'START'}
+                {isPaused ? 'RESUME' : 'START'}
               </button>
               
               <button
                 onClick={(e) => {
-                  console.log('🔘 STOP button onClick event fired');
+                  console.log('🔘 PAUSE button onClick event fired');
                   e.preventDefault();
                   e.stopPropagation();
-                  handleStop();
+                  handlePause();
                 }}
                 disabled={!isRunning}
-                className={`btn-danger flex items-center gap-3 ${!isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`btn-secondary flex items-center gap-3 ${!isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                 type="button"
               >
-                <Square className="w-6 h-6" />
-                STOP / RESET
+                <Pause className="w-6 h-6" />
+                PAUSE
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  console.log('🔘 RESET button onClick event fired');
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleReset();
+                }}
+                disabled={currentSessionTime === 0 && !isPaused}
+                className={`btn-danger flex items-center gap-3 ${currentSessionTime === 0 && !isPaused ? 'opacity-50 cursor-not-allowed' : ''}`}
+                type="button"
+              >
+                <RotateCcw className="w-6 h-6" />
+                RESET
               </button>
             </div>
             
             {isRunning && (
               <p className="text-muted-foreground animate-pulse-glow">
                 Timer running... Break reminder in {Math.floor((getBreakInterval() * 60 - currentSessionTime % (getBreakInterval() * 60)) / 60)} minutes
+              </p>
+            )}
+            
+            {isPaused && (
+              <p className="text-warning animate-pulse">
+                ⏸️ Timer paused at {formatTime(currentSessionTime)}
               </p>
             )}
           </section>
@@ -414,13 +509,52 @@ const Index = () => {
             </p>
           </section>
 
-          {/* Direct Exercise Button */}
-          <section className="text-center" style={{ animationDelay: '0.3s' }}>
-            <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3 mx-auto">
-              <Activity className="w-6 h-6" />
-              START EYE EXERCISE DIRECTLY
-            </button>
-          </section>
+          {/* Direct Exercise Button with Info Tooltips */}
+          <TooltipProvider>
+            <section className="text-center space-y-4" style={{ animationDelay: '0.3s' }}>
+              <div className="flex items-center justify-center gap-4">
+                <div className="relative inline-flex items-center">
+                  <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3">
+                    <Activity className="w-6 h-6" />
+                    Eye Exercise
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors">
+                        <Info className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>5s countdown → full cycle → Great job! → auto timer</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                
+                <div className="relative inline-flex items-center">
+                  <button 
+                    onClick={() => {
+                      incrementCloseEyesCount();
+                      setShowBlackScreen(true);
+                    }} 
+                    className="btn-secondary flex items-center gap-3"
+                  >
+                    <Moon className="w-6 h-6" />
+                    Eye Close Relax
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors">
+                        <Info className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>5s countdown → 5min relax → You did well! → auto timer</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </section>
+          </TooltipProvider>
         </div>
       </main>
 
