@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatMinutesSeconds } from '@/lib/userId';
-import { playEndSound, playDingDing } from '@/lib/sound';
+import { playEndSound, playDingDing, playStartSound } from '@/lib/sound';
 import { toast } from 'sonner';
 
 interface BlackScreenOverlayProps {
@@ -11,12 +11,13 @@ interface BlackScreenOverlayProps {
   duration?: number; // in seconds, default 300 (5 minutes)
 }
 
-type Phase = 'resting' | 'encouragement';
+type Phase = 'countdown' | 'resting' | 'encouragement';
 
 export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }: BlackScreenOverlayProps) {
   const navigate = useNavigate();
   const [timeRemaining, setTimeRemaining] = useState(duration);
-  const [phase, setPhase] = useState<Phase>('resting');
+  const [countdownTime, setCountdownTime] = useState(5);
+  const [phase, setPhase] = useState<Phase>('countdown');
 
   const handleComplete = useCallback(() => {
     // Show encouragement message
@@ -37,10 +38,35 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
 
     toast.info('Early end recorded');
 
-    // No encouragement for early end
+    // Navigate with fromRelax: true to trigger auto-resume (same as exercise)
     onClose();
     navigate('/', { state: { fromRelax: true, earlyEnd: true } });
   }, [onClose, onEarlyEnd, navigate]);
+
+  // Play start sound when countdown begins
+  useEffect(() => {
+    if (open && phase === 'countdown') {
+      playStartSound();
+    }
+  }, [open, phase]);
+
+  // Countdown timer (5 seconds)
+  useEffect(() => {
+    if (!open || phase !== 'countdown') return;
+
+    const interval = setInterval(() => {
+      setCountdownTime((prev) => {
+        if (prev <= 1) {
+          // Countdown complete - move to resting phase
+          setPhase('resting');
+          return 5;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [open, phase]);
 
   // Main resting timer
   useEffect(() => {
@@ -65,7 +91,8 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
   useEffect(() => {
     if (!open) {
       setTimeRemaining(duration);
-      setPhase('resting');
+      setCountdownTime(5);
+      setPhase('countdown');
     }
   }, [open, duration]);
 
@@ -88,6 +115,21 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     );
   }
 
+  // Countdown phase (5 seconds before rest starts)
+  if (phase === 'countdown') {
+    return (
+      <div className="black-screen-overlay">
+        <div className="text-center animate-fade-in">
+          <p className="text-foreground/80 text-2xl md:text-3xl mb-8 font-mono">
+            Rest starts in
+          </p>
+          <p className="countdown-text text-accent">
+            {countdownTime}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Resting phase (main timer)
   return (
