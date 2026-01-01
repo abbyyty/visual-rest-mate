@@ -3,12 +3,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 interface BreakPopupProps {
   open: boolean;
+  intervalMinutes: number;
   onEyeExercise: () => void;
   onCloseEyes: () => void;
   onSkip: () => void;
 }
 
-export function BreakPopup({ open, onEyeExercise, onCloseEyes, onSkip }: BreakPopupProps) {
+export function BreakPopup({ open, intervalMinutes, onEyeExercise, onCloseEyes, onSkip }: BreakPopupProps) {
+  const minuteText = intervalMinutes === 1 ? 'minute' : 'minutes';
+  
   return (
     <Dialog open={open}>
       <DialogContent className="sm:max-w-lg bg-card border-border/50" onPointerDownOutside={(e) => e.preventDefault()}>
@@ -19,7 +22,7 @@ export function BreakPopup({ open, onEyeExercise, onCloseEyes, onSkip }: BreakPo
         </DialogHeader>
         
         <p className="text-center text-muted-foreground text-lg mb-8">
-          You've been working for 30 minutes. Please choose:
+          You've been working for {intervalMinutes} {minuteText}. Please choose:
         </p>
         
         <div className="flex flex-col gap-4">
