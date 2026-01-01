@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { XCircle } from 'lucide-react';
+import { XCircle, CheckCircle } from 'lucide-react';
 import { ExerciseDot } from '@/components/ExerciseDot';
 import { formatMinutesSeconds } from '@/lib/userId';
-import { playStartSound, playOpenEyesSound } from '@/lib/sound';
+import { playStartSound, playOpenEyesSound, playEndSound } from '@/lib/sound';
+import { getUserSettings, getSpeedValue } from '@/lib/settings';
+import { useDailyStats } from '@/hooks/useDailyStats';
+import { Button } from '@/components/ui/button';
 
 type ExercisePhase = 
   | 'countdown'
@@ -12,7 +15,8 @@ type ExercisePhase =
   | 'horizontal'
   | 'circular'
   | 'diagonal1'
-  | 'diagonal2';
+  | 'diagonal2'
+  | 'complete';
 
 interface PhaseConfig {
   type: ExercisePhase;
@@ -21,69 +25,98 @@ interface PhaseConfig {
   showDot: boolean;
 }
 
-// Sequence starts with countdown only once, then loops from index 1 (close_eyes before vertical)
-const EXERCISE_SEQUENCE: PhaseConfig[] = [
-  { type: 'countdown', duration: 5, instruction: 'Exercise starts in', showDot: false },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-  { type: 'vertical', duration: 20, instruction: 'Follow the dot - Vertical', showDot: true },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-  { type: 'horizontal', duration: 20, instruction: 'Follow the dot - Horizontal', showDot: true },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-  { type: 'circular', duration: 20, instruction: 'Follow the dot - Circular', showDot: true },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-  { type: 'diagonal1', duration: 20, instruction: 'Follow the dot - Diagonal ↘', showDot: true },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-  { type: 'diagonal2', duration: 20, instruction: 'Follow the dot - Diagonal ↙', showDot: true },
-  { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
-];
+// Full sequence: 5s countdown → 2 complete cycles → end
+// Cycle: EC10 → V20 → EC10 → H20 → EC10 → C20 → EC10 → DI20 → EC10 → DII20
+const buildExerciseSequence = (): PhaseConfig[] => {
+  const settings = getUserSettings();
+  
+  // Get speed values for each exercise (values are in seconds per pass)
+  const vSpeed = getSpeedValue('vertical', settings.speeds.vertical);
+  const hSpeed = getSpeedValue('horizontal', settings.speeds.horizontal);
+  const cSpeed = getSpeedValue('circular', settings.speeds.circular);
+  const d1Speed = getSpeedValue('diagonal1', settings.speeds.diagonal1);
+  const d2Speed = getSpeedValue('diagonal2', settings.speeds.diagonal2);
 
-// Loop start index - after initial countdown, loop from here (skips countdown)
-const LOOP_START_INDEX = 1;
+  const cycle: PhaseConfig[] = [
+    { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
+    { type: 'vertical', duration: 20, instruction: 'Follow the dot - Vertical', showDot: true },
+    { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
+    { type: 'horizontal', duration: 20, instruction: 'Follow the dot - Horizontal', showDot: true },
+    { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
+    { type: 'circular', duration: 20, instruction: 'Follow the dot - Circular', showDot: true },
+    { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
+    { type: 'diagonal1', duration: 20, instruction: 'Follow the dot - Diagonal ↘', showDot: true },
+    { type: 'close_eyes', duration: 10, instruction: 'Close your eyes', showDot: false },
+    { type: 'diagonal2', duration: 20, instruction: 'Follow the dot - Diagonal ↙', showDot: true },
+  ];
+
+  return [
+    { type: 'countdown', duration: 5, instruction: 'Exercise starts in', showDot: false },
+    ...cycle, // First cycle
+    ...cycle, // Second cycle
+    { type: 'complete', duration: 0, instruction: 'Exercise Complete!', showDot: false },
+  ];
+};
 
 const EyeExercise = () => {
   const navigate = useNavigate();
+  const { incrementEmergencyStopCount } = useDailyStats();
+  
+  const [exerciseSequence, setExerciseSequence] = useState<PhaseConfig[]>([]);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
   const [phaseTime, setPhaseTime] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
   const [dotPosition, setDotPosition] = useState({ x: 50, y: 50 });
+  const [isComplete, setIsComplete] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const dotAnimationRef = useRef<NodeJS.Timeout | null>(null);
+  const settingsRef = useRef(getUserSettings());
 
-  const currentPhase = EXERCISE_SEQUENCE[currentPhaseIndex];
-  const timeRemaining = currentPhase.duration - phaseTime;
+  // Build sequence on mount
+  useEffect(() => {
+    const sequence = buildExerciseSequence();
+    setExerciseSequence(sequence);
+    settingsRef.current = getUserSettings();
+  }, []);
+
+  const currentPhase = exerciseSequence[currentPhaseIndex];
+  const timeRemaining = currentPhase ? currentPhase.duration - phaseTime : 0;
 
   const stopAllTimers = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (dotAnimationRef.current) {
-      clearInterval(dotAnimationRef.current);
-      dotAnimationRef.current = null;
-    }
   }, []);
 
   const handleEmergencyStop = useCallback(() => {
     stopAllTimers();
+    incrementEmergencyStopCount();
     navigate('/');
-  }, [stopAllTimers, navigate]);
+  }, [stopAllTimers, incrementEmergencyStopCount, navigate]);
 
-  // Dot animation based on phase type
-  const animateDot = useCallback((type: ExercisePhase, elapsed: number, duration: number) => {
+  const handleReturnToMain = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  // Dot animation based on phase type with user-configured speeds
+  const animateDot = useCallback((type: ExercisePhase, elapsed: number) => {
+    const settings = settingsRef.current;
+    
     switch (type) {
       case 'vertical': {
-        // Move up and down (1s per pass = 20 passes in 20s)
-        const cycleProgress = (elapsed % 2) / 2;
+        const speed = getSpeedValue('vertical', settings.speeds.vertical);
+        const fullCycle = speed * 2; // up-down cycle
+        const cycleProgress = (elapsed % fullCycle) / fullCycle;
         const y = cycleProgress < 0.5 
-          ? 15 + (cycleProgress * 2) * 70  // top to bottom
-          : 85 - ((cycleProgress - 0.5) * 2) * 70; // bottom to top
+          ? 15 + (cycleProgress * 2) * 70 
+          : 85 - ((cycleProgress - 0.5) * 2) * 70;
         setDotPosition({ x: 50, y });
         break;
       }
       case 'horizontal': {
-        // 1.5s per pass (left→right→left = 3s full cycle)
-        const cycleProgress = (elapsed % 3) / 3;
+        const speed = getSpeedValue('horizontal', settings.speeds.horizontal);
+        const fullCycle = speed * 2; // left-right cycle
+        const cycleProgress = (elapsed % fullCycle) / fullCycle;
         const x = cycleProgress < 0.5 
           ? 15 + (cycleProgress * 2) * 70 
           : 85 - ((cycleProgress - 0.5) * 2) * 70;
@@ -91,9 +124,8 @@ const EyeExercise = () => {
         break;
       }
       case 'circular': {
-        // 2s per circle = 10 circles in 20s - PERFECT CIRCLE using equal radius
-        const angle = (elapsed / 2) * Math.PI * 2;
-        // Use 22% for both X and Y to create a perfect circle
+        const speed = getSpeedValue('circular', settings.speeds.circular);
+        const angle = (elapsed / speed) * Math.PI * 2;
         const radius = 22;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
@@ -101,8 +133,9 @@ const EyeExercise = () => {
         break;
       }
       case 'diagonal1': {
-        // Top-left to bottom-right (1.5s per diagonal)
-        const cycleProgress = (elapsed % 3) / 3;
+        const speed = getSpeedValue('diagonal1', settings.speeds.diagonal1);
+        const fullCycle = speed * 2;
+        const cycleProgress = (elapsed % fullCycle) / fullCycle;
         if (cycleProgress < 0.5) {
           const t = cycleProgress * 2;
           setDotPosition({ x: 15 + t * 70, y: 15 + t * 70 });
@@ -113,8 +146,9 @@ const EyeExercise = () => {
         break;
       }
       case 'diagonal2': {
-        // Top-right to bottom-left
-        const cycleProgress = (elapsed % 3) / 3;
+        const speed = getSpeedValue('diagonal2', settings.speeds.diagonal2);
+        const fullCycle = speed * 2;
+        const cycleProgress = (elapsed % fullCycle) / fullCycle;
         if (cycleProgress < 0.5) {
           const t = cycleProgress * 2;
           setDotPosition({ x: 85 - t * 70, y: 15 + t * 70 });
@@ -131,20 +165,30 @@ const EyeExercise = () => {
 
   // Main timer effect
   useEffect(() => {
+    if (exerciseSequence.length === 0 || isComplete) return;
+
     timerRef.current = setInterval(() => {
       setPhaseTime((prev) => {
         const newTime = prev + 0.05;
         
+        if (!currentPhase) return prev;
+        
         if (newTime >= currentPhase.duration) {
-          // Move to next phase - loop from LOOP_START_INDEX after reaching end (skip countdown on loop)
-          let nextIndex = currentPhaseIndex + 1;
-          if (nextIndex >= EXERCISE_SEQUENCE.length) {
-            nextIndex = LOOP_START_INDEX; // Loop back to close_eyes before vertical (skip countdown)
+          // Move to next phase
+          const nextIndex = currentPhaseIndex + 1;
+          
+          if (nextIndex >= exerciseSequence.length || exerciseSequence[nextIndex].type === 'complete') {
+            // Exercise complete!
+            setIsComplete(true);
+            stopAllTimers();
+            playEndSound();
+            return prev;
           }
+          
           setCurrentPhaseIndex(nextIndex);
           
           // Play appropriate sound
-          const nextPhase = EXERCISE_SEQUENCE[nextIndex];
+          const nextPhase = exerciseSequence[nextIndex];
           if (nextPhase.showDot && currentPhase.type === 'close_eyes') {
             playOpenEyesSound();
           }
@@ -154,13 +198,11 @@ const EyeExercise = () => {
         
         // Update dot position for movement phases
         if (currentPhase.showDot) {
-          animateDot(currentPhase.type, newTime, currentPhase.duration);
+          animateDot(currentPhase.type, newTime);
         }
         
         return newTime;
       });
-      
-      setTotalTime((prev) => prev + 0.05);
     }, 50);
 
     return () => {
@@ -168,21 +210,49 @@ const EyeExercise = () => {
         clearInterval(timerRef.current);
       }
     };
-  }, [currentPhaseIndex, currentPhase, animateDot]);
+  }, [currentPhaseIndex, currentPhase, animateDot, exerciseSequence, isComplete, stopAllTimers]);
 
   // Play start sound on first countdown
   useEffect(() => {
-    if (currentPhaseIndex === 0 && phaseTime < 0.1) {
+    if (currentPhaseIndex === 0 && phaseTime < 0.1 && exerciseSequence.length > 0) {
       playStartSound();
     }
-  }, [currentPhaseIndex, phaseTime]);
+  }, [currentPhaseIndex, phaseTime, exerciseSequence]);
 
   const getInstructionText = () => {
+    if (!currentPhase) return 'Loading...';
     if (currentPhase.type === 'countdown') {
       return `${currentPhase.instruction} ${Math.ceil(timeRemaining)}...`;
     }
     return currentPhase.instruction;
   };
+
+  // Completion screen
+  if (isComplete) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <div className="text-center space-y-8 animate-fade-in">
+          <CheckCircle className="w-24 h-24 text-success mx-auto" />
+          <h1 className="text-4xl font-mono text-foreground">Exercise Complete!</h1>
+          <p className="text-xl text-muted-foreground">Great job taking care of your eyes.</p>
+          <Button 
+            onClick={handleReturnToMain}
+            className="btn-primary text-lg px-8 py-4"
+          >
+            Return to Main
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (exerciseSequence.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
@@ -223,14 +293,14 @@ const EyeExercise = () => {
         </div>
 
         {/* Dot container */}
-        {currentPhase.showDot && (
+        {currentPhase?.showDot && (
           <div className="absolute inset-0 m-8">
             <ExerciseDot x={dotPosition.x} y={dotPosition.y} />
           </div>
         )}
 
         {/* Close eyes indicator */}
-        {currentPhase.type === 'close_eyes' && (
+        {currentPhase?.type === 'close_eyes' && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center animate-fade-in">
               <div className="text-8xl mb-4">👁️</div>
@@ -242,7 +312,7 @@ const EyeExercise = () => {
         )}
 
         {/* Countdown indicator */}
-        {currentPhase.type === 'countdown' && (
+        {currentPhase?.type === 'countdown' && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center animate-fade-in">
               <p className="countdown-text text-accent">

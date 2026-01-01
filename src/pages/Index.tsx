@@ -1,36 +1,49 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Moon, SkipForward, Play, Square, Activity } from 'lucide-react';
+import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle } from 'lucide-react';
 import { getTodayDate, formatTime } from '@/lib/userId';
 import { useDailyStats } from '@/hooks/useDailyStats';
 import { StatCard } from '@/components/StatCard';
 import { BreakPopup } from '@/components/BreakPopup';
 import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
 import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
+import { sendBreakNotification, registerServiceWorker, requestNotificationPermission } from '@/lib/notifications';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { stats, loading, incrementExerciseCount, incrementCloseEyesCount, incrementSkipCount, addScreenTime } = useDailyStats();
+  const { stats, loading, incrementExerciseCount, incrementCloseEyesCount, incrementSkipCount, addScreenTime, incrementEmergencyStopCount } = useDailyStats();
   
   const [isRunning, setIsRunning] = useState(false);
-  const [sessionTime, setSessionTime] = useState(0);
+  const [currentSessionTime, setCurrentSessionTime] = useState(0);
   const [showBreakPopup, setShowBreakPopup] = useState(false);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionStartRef = useRef<number | null>(null);
+  const hasRequestedPermission = useRef(false);
 
-  const handleStart = useCallback(() => {
+  // Register service worker on mount
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  const handleStart = useCallback(async () => {
+    // Request notification permission on first start
+    if (!hasRequestedPermission.current) {
+      await requestNotificationPermission();
+      hasRequestedPermission.current = true;
+    }
+
     setIsRunning(true);
-    setSessionTime(0);
-    sessionStartRef.current = Date.now();
+    setCurrentSessionTime(0);
     
     const breakIntervalSeconds = getBreakInterval() * 60;
     
     timerRef.current = setInterval(() => {
-      setSessionTime((prev) => {
+      setCurrentSessionTime((prev) => {
         const newTime = prev + 1;
         if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
+          // Send notification and show popup
+          sendBreakNotification(Math.floor(newTime / 60));
           setShowBreakPopup(true);
         }
         return newTime;
@@ -45,12 +58,12 @@ const Index = () => {
       timerRef.current = null;
     }
     
-    if (sessionTime > 0) {
-      addScreenTime(sessionTime);
+    // Add current session to today's total
+    if (currentSessionTime > 0) {
+      addScreenTime(currentSessionTime);
     }
-    setSessionTime(0);
-    sessionStartRef.current = null;
-  }, [sessionTime, addScreenTime]);
+    setCurrentSessionTime(0);
+  }, [currentSessionTime, addScreenTime]);
 
   const handleEyeExercise = useCallback(() => {
     setShowBreakPopup(false);
@@ -82,9 +95,11 @@ const Index = () => {
     };
   }, []);
 
-  const totalScreenTime = (stats?.total_screen_time_seconds ?? 0) + sessionTime;
+  // Today's total is from Supabase (accumulated sessions)
+  const todaysTotalTime = stats?.total_screen_time_seconds ?? 0;
   const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
-  const totalHours = Math.floor(totalScreenTime / 3600);
+  const totalHours = Math.floor(todaysTotalTime / 3600);
+  const emergencyStops = stats?.emergency_stop_count ?? 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -102,14 +117,24 @@ const Index = () => {
         <div className="max-w-6xl w-full space-y-12">
           
           {/* Timer Section */}
-          <section className="text-center space-y-8 animate-fade-in">
-            <h2 className="text-muted-foreground text-xl">Today's screen time</h2>
-            
-            <div className="timer-display text-primary">
-              {formatTime(totalScreenTime)}
+          <section className="text-center space-y-6 animate-fade-in">
+            {/* Current Session Timer (Big, Bold) */}
+            <div className="space-y-2">
+              <h2 className="text-muted-foreground text-lg">Current Session</h2>
+              <div className="timer-display text-primary">
+                {formatTime(currentSessionTime)}
+              </div>
+            </div>
+
+            {/* Today's Total Timer (Small, Light) */}
+            <div className="space-y-1">
+              <h3 className="text-muted-foreground text-sm">Today's Total</h3>
+              <div className="text-2xl font-mono text-muted-foreground">
+                {formatTime(todaysTotalTime)}
+              </div>
             </div>
             
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-6 pt-4">
               <SettingsModal />
               
               <button
@@ -127,19 +152,19 @@ const Index = () => {
                 className={`btn-danger flex items-center gap-3 ${!isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Square className="w-6 h-6" />
-                STOP
+                STOP / RESET
               </button>
             </div>
             
             {isRunning && (
               <p className="text-muted-foreground animate-pulse-glow">
-                Timer running... Break reminder in {Math.floor((getBreakInterval() * 60 - (sessionTime % (getBreakInterval() * 60))) / 60)} minutes
+                Timer running... Break reminder in {Math.floor((getBreakInterval() * 60 - (currentSessionTime % (getBreakInterval() * 60))) / 60)} minutes
               </p>
             )}
           </section>
 
           {/* Stats Cards */}
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ animationDelay: '0.1s' }}>
+          <section className="grid grid-cols-1 md:grid-cols-4 gap-6" style={{ animationDelay: '0.1s' }}>
             <StatCard
               icon={<Eye className="w-8 h-8" />}
               label="Eye exercises"
@@ -157,6 +182,12 @@ const Index = () => {
               label="Skip breaks"
               value={stats?.skip_count ?? 0}
               color="warning"
+            />
+            <StatCard
+              icon={<AlertCircle className="w-8 h-8" />}
+              label="Emergency stops"
+              value={emergencyStops}
+              color="danger"
             />
           </section>
 

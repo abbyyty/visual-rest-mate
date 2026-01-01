@@ -4,13 +4,14 @@ interface StatCardProps {
   icon: ReactNode;
   label: string;
   value: number;
-  color: 'primary' | 'success' | 'warning';
+  color: 'primary' | 'success' | 'warning' | 'danger';
 }
 
 const colorClasses = {
   primary: 'text-primary',
   success: 'text-success',
   warning: 'text-warning',
+  danger: 'text-destructive',
 };
 
 export function StatCard({ icon, label, value, color }: StatCardProps) {
