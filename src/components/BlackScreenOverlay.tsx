@@ -17,7 +17,6 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
   const navigate = useNavigate();
   const [timeRemaining, setTimeRemaining] = useState(duration);
   const [phase, setPhase] = useState<Phase>('resting');
-  const [countdownValue, setCountdownValue] = useState(5);
 
   const handleComplete = useCallback(() => {
     // Show encouragement message
