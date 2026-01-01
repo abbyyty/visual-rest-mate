@@ -111,12 +111,15 @@ const Index = () => {
             console.log(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
             playDingDing();
             
-            // Calculate session overuse = time since last ding (or 0 if first ding)
-            if (lastDingTimeRef.current > 0) {
-              // User ignored previous reminder - add that interval as session overuse
-              const overuseFromIgnore = breakIntervalSeconds;
-              setSessionOveruseSeconds(prev => prev + overuseFromIgnore);
-              console.log(`🔥 Added session overuse: ${formatTime(overuseFromIgnore)}`);
+            // Calculate overuse since last popup (or since start if first popup)
+            const timeSinceLastDing = lastDingTimeRef.current > 0 
+              ? newTime - lastDingTimeRef.current 
+              : 0;
+            
+            // If user ignored previous reminder, that time is overuse
+            if (timeSinceLastDing > 0) {
+              console.log(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
+              setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
             }
             
             lastDingTimeRef.current = newTime;

@@ -11,7 +11,7 @@ interface BlackScreenOverlayProps {
   duration?: number; // in seconds, default 300 (5 minutes)
 }
 
-type Phase = 'resting' | 'countdown' | 'encouragement';
+type Phase = 'resting' | 'encouragement';
 
 export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }: BlackScreenOverlayProps) {
   const navigate = useNavigate();
@@ -52,25 +52,8 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          // Start countdown phase
-          setPhase('countdown');
+          // Timer complete - go directly to encouragement (no countdown at end)
           playDingDing();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [open, phase]);
-
-  // Countdown timer (5 seconds before resume)
-  useEffect(() => {
-    if (phase !== 'countdown') return;
-
-    const interval = setInterval(() => {
-      setCountdownValue((prev) => {
-        if (prev <= 1) {
           handleComplete();
           return 0;
         }
@@ -79,7 +62,7 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [phase, handleComplete]);
+  }, [open, phase, handleComplete]);
 
   // Reset state when closed
   useEffect(() => {
