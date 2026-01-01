@@ -37,7 +37,7 @@ export function BreakPopup({ open, intervalMinutes, overuseSeconds, onEyeExercis
         
         {hasOveruse && (
           <p className="text-center text-destructive text-lg font-semibold mb-4">
-            🔥 Overuse: {formatOveruseTime(overuseSeconds)}
+            ⏰ Session overuse: {formatOveruseTime(overuseSeconds)}
           </p>
         )}
         
