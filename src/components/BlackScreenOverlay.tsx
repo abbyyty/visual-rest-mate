@@ -123,9 +123,15 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
           <p className="text-foreground/80 text-2xl md:text-3xl mb-8 font-mono">
             Rest starts in
           </p>
-          <p className="countdown-text text-accent">
+          <p className="countdown-text text-accent mb-12">
             {countdownTime}
           </p>
+          <button
+            onClick={handleEarlyEnd}
+            className="btn-secondary px-12"
+          >
+            Early End
+          </button>
         </div>
       </div>
     );
