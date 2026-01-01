@@ -17,7 +17,7 @@ const Index = () => {
     incrementCloseEyesCount,
     incrementSkipCount,
     addScreenTime,
-    incrementEmergencyStopCount
+    incrementEarlyEndCount
   } = useDailyStats();
   const [isRunning, setIsRunning] = useState(false);
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
@@ -206,7 +206,7 @@ const Index = () => {
   const todaysTotalLive = todaysTotalBase + (isRunning ? currentSessionTime : 0);
   const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
   const totalHours = Math.floor(todaysTotalLive / 3600);
-  const emergencyStops = stats?.emergency_stop_count ?? 0;
+  const earlyEnds = stats?.early_end_count ?? 0;
   return <div className="min-h-screen bg-background flex flex-col">
       {/* Header with Date */}
       <header className="py-6 px-8 border-b border-border/30">
@@ -275,7 +275,7 @@ const Index = () => {
             <StatCard icon={<Eye className="w-8 h-8" />} label="Eye exercises" value={stats?.exercise_count ?? 0} color="primary" />
             <StatCard icon={<Moon className="w-8 h-8" />} label="Close eyes rest" value={stats?.close_eyes_count ?? 0} color="success" />
             <StatCard icon={<SkipForward className="w-8 h-8" />} label="Skip breaks" value={stats?.skip_count ?? 0} color="warning" />
-            <StatCard icon={<AlertCircle className="w-8 h-8" />} label="Emergency stops" value={emergencyStops} color="danger" />
+            <StatCard icon={<AlertCircle className="w-8 h-8" />} label="Early Ends" value={earlyEnds} color="danger" />
           </section>
 
           {/* Summary */}
@@ -304,7 +304,11 @@ const Index = () => {
       <BreakPopup open={showBreakPopup} intervalMinutes={getBreakInterval()} onEyeExercise={handleEyeExercise} onCloseEyes={handleCloseEyes} onSkip={handleSkip} />
 
       {/* Black Screen Overlay */}
-      <BlackScreenOverlay open={showBlackScreen} onClose={() => setShowBlackScreen(false)} />
+      <BlackScreenOverlay 
+        open={showBlackScreen} 
+        onClose={() => setShowBlackScreen(false)} 
+        onEarlyEnd={incrementEarlyEndCount}
+      />
     </div>;
 };
 export default Index;

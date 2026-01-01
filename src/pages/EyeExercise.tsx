@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { XCircle, CheckCircle } from 'lucide-react';
+import { StopCircle, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { ExerciseDot } from '@/components/ExerciseDot';
 import { formatMinutesSeconds } from '@/lib/userId';
 import { playStartSound, playOpenEyesSound, playEndSound } from '@/lib/sound';
@@ -60,7 +61,7 @@ const buildExerciseSequence = (): PhaseConfig[] => {
 
 const EyeExercise = () => {
   const navigate = useNavigate();
-  const { incrementEmergencyStopCount } = useDailyStats();
+  const { incrementEarlyEndCount } = useDailyStats();
   
   const [exerciseSequence, setExerciseSequence] = useState<PhaseConfig[]>([]);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -88,11 +89,12 @@ const EyeExercise = () => {
     }
   }, []);
 
-  const handleEmergencyStop = useCallback(() => {
+  const handleEarlyEnd = useCallback(() => {
     stopAllTimers();
-    incrementEmergencyStopCount();
+    incrementEarlyEndCount();
+    toast.success('Early end recorded');
     navigate('/');
-  }, [stopAllTimers, incrementEmergencyStopCount, navigate]);
+  }, [stopAllTimers, incrementEarlyEndCount, navigate]);
 
   const handleReturnToMain = useCallback(() => {
     navigate('/');
@@ -273,11 +275,11 @@ const EyeExercise = () => {
             </div>
             
             <button
-              onClick={handleEmergencyStop}
-              className="btn-danger flex items-center gap-2 py-3"
+              onClick={handleEarlyEnd}
+              className="btn-secondary flex items-center gap-2 py-3"
             >
-              <XCircle className="w-5 h-5" />
-              EMERGENCY STOP
+              <StopCircle className="w-5 h-5" />
+              Early End
             </button>
           </div>
         </div>
