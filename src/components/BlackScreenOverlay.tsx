@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatMinutesSeconds } from '@/lib/userId';
-import { playEndSound } from '@/lib/sound';
+import { playEndSound, playDingDing } from '@/lib/sound';
 import { toast } from 'sonner';
 
 interface BlackScreenOverlayProps {
@@ -10,32 +11,50 @@ interface BlackScreenOverlayProps {
   duration?: number; // in seconds, default 300 (5 minutes)
 }
 
-export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }: BlackScreenOverlayProps) {
-  const [timeRemaining, setTimeRemaining] = useState(duration);
+type Phase = 'resting' | 'countdown' | 'encouragement';
 
-  const handleEnd = useCallback(() => {
+export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }: BlackScreenOverlayProps) {
+  const navigate = useNavigate();
+  const [timeRemaining, setTimeRemaining] = useState(duration);
+  const [phase, setPhase] = useState<Phase>('resting');
+  const [countdownValue, setCountdownValue] = useState(5);
+
+  const handleComplete = useCallback(() => {
+    // Show encouragement message
+    setPhase('encouragement');
     playEndSound();
-    onClose();
-  }, [onClose]);
+    
+    // After 3 seconds, navigate to main page with auto-start flag
+    setTimeout(() => {
+      onClose();
+      navigate('/', { state: { fromRelax: true } });
+    }, 3000);
+  }, [onClose, navigate]);
 
   const handleEarlyEnd = useCallback(() => {
     if (onEarlyEnd) {
       onEarlyEnd();
-      toast.success('Early end recorded');
     }
-    onClose();
-  }, [onClose, onEarlyEnd]);
+    
+    // Show encouragement then navigate with auto-start
+    setPhase('encouragement');
+    
+    setTimeout(() => {
+      onClose();
+      navigate('/', { state: { fromRelax: true } });
+    }, 2000);
+  }, [onClose, onEarlyEnd, navigate]);
 
+  // Main resting timer
   useEffect(() => {
-    if (!open) {
-      setTimeRemaining(duration);
-      return;
-    }
+    if (!open || phase !== 'resting') return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          handleEnd();
+          // Start countdown phase
+          setPhase('countdown');
+          playDingDing();
           return 0;
         }
         return prev - 1;
@@ -43,10 +62,70 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [open, duration, handleEnd]);
+  }, [open, phase]);
+
+  // Countdown timer (5 seconds before resume)
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+
+    const interval = setInterval(() => {
+      setCountdownValue((prev) => {
+        if (prev <= 1) {
+          handleComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, handleComplete]);
+
+  // Reset state when closed
+  useEffect(() => {
+    if (!open) {
+      setTimeRemaining(duration);
+      setPhase('resting');
+      setCountdownValue(5);
+    }
+  }, [open, duration]);
 
   if (!open) return null;
 
+  // Encouragement phase
+  if (phase === 'encouragement') {
+    return (
+      <div className="black-screen-overlay">
+        <div className="text-center animate-fade-in">
+          <p className="text-6xl mb-6">👏</p>
+          <p className="text-success text-3xl md:text-4xl font-bold mb-4">
+            You did well!!
+          </p>
+          <p className="text-success/80 text-xl">
+            Keep protecting your eyes!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Countdown phase (resume work countdown)
+  if (phase === 'countdown') {
+    return (
+      <div className="black-screen-overlay">
+        <div className="text-center animate-fade-in">
+          <p className="text-foreground/80 text-2xl md:text-3xl mb-8">
+            Resume work in...
+          </p>
+          <div className="countdown-text text-accent">
+            {countdownValue}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Resting phase (main timer)
   return (
     <div className="black-screen-overlay">
       <div className="text-center animate-fade-in">

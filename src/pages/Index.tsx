@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame } from 'lucide-react';
 import { getTodayDate, formatTime } from '@/lib/userId';
 import { useDailyStats } from '@/hooks/useDailyStats';
@@ -8,9 +8,11 @@ import { BreakPopup } from '@/components/BreakPopup';
 import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
 import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
 import { playDingDing } from '@/lib/sound';
+import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     stats,
     loading,
@@ -32,6 +34,9 @@ const Index = () => {
   const isMountedRef = useRef(true);
   const lastDingTimeRef = useRef(0); // When last ding occurred
 
+  // Auto-start from exercise or relax navigation
+  const autoStartTriggeredRef = useRef(false);
+  
   // Cleanup on unmount
   useEffect(() => {
     console.log('🔧 Index component mounted');
@@ -132,6 +137,24 @@ const Index = () => {
       }
     }
   }, [isRunning]);
+
+  // Handle auto-start from exercise/relax navigation
+  useEffect(() => {
+    const state = location.state as { fromExercise?: boolean; fromRelax?: boolean } | null;
+    
+    if ((state?.fromExercise || state?.fromRelax) && !autoStartTriggeredRef.current && !isRunning) {
+      autoStartTriggeredRef.current = true;
+      
+      // Clear the navigation state to prevent re-triggering
+      navigate('/', { replace: true, state: {} });
+      
+      // Auto-start timer after a short delay
+      setTimeout(() => {
+        handleStart();
+        toast.success('✅ Timer resumed - stay productive!');
+      }, 1000);
+    }
+  }, [location.state, isRunning, navigate, handleStart]);
 
   const handleStop = useCallback(() => {
     try {

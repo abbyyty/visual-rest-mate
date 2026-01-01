@@ -92,13 +92,20 @@ const EyeExercise = () => {
   const handleEarlyEnd = useCallback(() => {
     stopAllTimers();
     incrementEarlyEndCount();
-    toast.success('Early end recorded');
-    navigate('/');
-  }, [stopAllTimers, incrementEarlyEndCount, navigate]);
+    setIsComplete(true); // Trigger encouragement flow
+  }, [stopAllTimers, incrementEarlyEndCount]);
 
-  const handleReturnToMain = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
+  // Auto-navigate after completion with encouragement
+  useEffect(() => {
+    if (!isComplete) return;
+    
+    // Wait 3 seconds for encouragement message, then navigate with auto-start flag
+    const timer = setTimeout(() => {
+      navigate('/', { state: { fromExercise: true } });
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [isComplete, navigate]);
 
   // Dot animation based on phase type with user-configured speeds
   const animateDot = useCallback((type: ExercisePhase, elapsed: number) => {
@@ -229,20 +236,17 @@ const EyeExercise = () => {
     return currentPhase.instruction;
   };
 
-  // Completion screen
+  // Completion screen with encouragement (auto-navigates after 3s)
   if (isComplete) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <div className="text-center space-y-8 animate-fade-in">
-          <CheckCircle className="w-24 h-24 text-success mx-auto" />
-          <h1 className="text-4xl font-mono text-foreground">Exercise Complete!</h1>
-          <p className="text-xl text-muted-foreground">Great job taking care of your eyes.</p>
-          <Button 
-            onClick={handleReturnToMain}
-            className="btn-primary text-lg px-8 py-4"
-          >
-            Return to Main
-          </Button>
+        <div className="text-center space-y-6 animate-fade-in">
+          <p className="text-6xl">👏</p>
+          <h1 className="text-4xl font-bold text-success">Great job!</h1>
+          <p className="text-xl text-success/80">Eyes refreshed!</p>
+          <p className="text-muted-foreground text-lg animate-pulse">
+            Returning to main page...
+          </p>
         </div>
       </div>
     );
