@@ -512,24 +512,33 @@ const Index = () => {
           {/* Direct Exercise Button with Info Tooltips */}
           <TooltipProvider>
             <section className="text-center space-y-4" style={{ animationDelay: '0.3s' }}>
-              <div className="flex items-center justify-center gap-4">
+              {/* Direct Start Exercise Button */}
+              <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3 mx-auto">
+                <Activity className="w-6 h-6" />
+                Direct Start Exercise
+              </button>
+              
+              {/* 4 Main Buttons with Info Tooltips */}
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                {/* Eye Exercise */}
                 <div className="relative inline-flex items-center">
-                  <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3">
-                    <Activity className="w-6 h-6" />
+                  <button onClick={handleDirectExercise} className="btn-primary flex items-center gap-3">
+                    <Eye className="w-5 h-5" />
                     Eye Exercise
                   </button>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors">
-                        <Info className="w-3 h-3 text-muted-foreground" />
-                      </button>
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
+                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
+                      </span>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs">
-                      <p>5s countdown → full cycle → Great job! → auto timer</p>
+                    <TooltipContent side="top" className="max-w-sm">
+                      <p>You will be guided to do eye muscle exercise with messages and sound. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 
+                {/* Eye Close Relax */}
                 <div className="relative inline-flex items-center">
                   <button 
                     onClick={() => {
@@ -538,17 +547,56 @@ const Index = () => {
                     }} 
                     className="btn-secondary flex items-center gap-3"
                   >
-                    <Moon className="w-6 h-6" />
+                    <Moon className="w-5 h-5" />
                     Eye Close Relax
                   </button>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors">
-                        <Info className="w-3 h-3 text-muted-foreground" />
-                      </button>
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
+                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm">
+                      <p>You will be guided to have 5 minutes eye-closing program for relaxation. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                
+                {/* Skip */}
+                <div className="relative inline-flex items-center">
+                  <button 
+                    onClick={handleSkip} 
+                    className="btn-warning flex items-center gap-3"
+                  >
+                    <SkipForward className="w-5 h-5" />
+                    Skip
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
+                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
-                      <p>5s countdown → 5min relax → You did well! → auto timer</p>
+                      <p>Redirect to the mainpage and timer restarts immediately from 0:00</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                
+                {/* Early End */}
+                <div className="relative inline-flex items-center">
+                  <div className="btn-danger flex items-center gap-3 cursor-default">
+                    <AlertCircle className="w-5 h-5" />
+                    Early End: {earlyEnds}
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
+                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>Counts of early ends</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
