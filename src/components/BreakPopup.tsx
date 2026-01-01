@@ -1,6 +1,5 @@
-import { Eye, Moon, SkipForward, Bell } from 'lucide-react';
+import { Eye, Moon, SkipForward } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { formatMinutesSeconds } from '@/lib/userId';
 
 interface BreakPopupProps {
   open: boolean;
@@ -19,6 +18,13 @@ function formatOveruseTime(seconds: number): string {
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 }
 
+function formatWorkedTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
 export function BreakPopup({
   open,
   intervalMinutes,
@@ -30,6 +36,18 @@ export function BreakPopup({
 }: BreakPopupProps) {
   const minuteText = intervalMinutes === 1 ? 'minute' : 'minutes';
   const hasOveruse = overuseSeconds > 0;
+
+  return (
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="text-center text-2xl">
+            ⏰ Time for a Break!
+          </DialogTitle>
+          <DialogDescription className="text-center text-lg">
+            You've been working for {formatWorkedTime(workedSeconds)}. Take a {intervalMinutes} {minuteText} break to rest your eyes.
+          </DialogDescription>
+        </DialogHeader>
         
         {hasOveruse && (
           <p className="text-center text-destructive text-lg font-semibold mb-4">
