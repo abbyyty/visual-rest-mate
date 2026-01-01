@@ -1,36 +1,84 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings } from 'lucide-react';
+import { Settings, Bell, BellOff } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS } from '@/lib/settings';
+import { getNotificationPermissionStatus, requestNotificationPermission } from '@/lib/notifications';
 
-const STORAGE_KEY = 'breakIntervalMinutes';
-const DEFAULT_INTERVAL = 30;
-const MIN_INTERVAL = 10;
-const MAX_INTERVAL = 30;
+type SpeedValue = 'slow' | 'normal' | 'fast';
+const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
 
-export function getBreakInterval(): number {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const value = parseInt(stored, 10);
-    if (!isNaN(value) && value >= MIN_INTERVAL && value <= MAX_INTERVAL) {
-      return value;
-    }
-  }
-  return DEFAULT_INTERVAL;
+function SpeedSlider({ 
+  label, 
+  sublabel,
+  value, 
+  onChange 
+}: { 
+  label: string; 
+  sublabel: string;
+  value: SpeedValue; 
+  onChange: (value: SpeedValue) => void;
+}) {
+  const index = SPEED_OPTIONS.indexOf(value);
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-sm text-foreground">{label}</Label>
+          <p className="text-xs text-muted-foreground">{sublabel}</p>
+        </div>
+        <span className="text-sm font-mono text-primary capitalize">{value}</span>
+      </div>
+      <Slider
+        value={[index]}
+        onValueChange={(values) => onChange(SPEED_OPTIONS[values[0]])}
+        min={0}
+        max={2}
+        step={1}
+        className="w-full"
+      />
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>Slow</span>
+        <span>Normal</span>
+        <span>Fast</span>
+      </div>
+    </div>
+  );
 }
 
 export function SettingsModal() {
   const [open, setOpen] = useState(false);
-  const [interval, setInterval] = useState(DEFAULT_INTERVAL);
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [notificationStatus, setNotificationStatus] = useState<string>('default');
 
   useEffect(() => {
-    setInterval(getBreakInterval());
+    if (open) {
+      setSettings(getUserSettings());
+      setNotificationStatus(getNotificationPermissionStatus());
+    }
   }, [open]);
 
   const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, interval.toString());
+    saveUserSettings(settings);
     setOpen(false);
+  };
+
+  const handleNotificationToggle = async () => {
+    const granted = await requestNotificationPermission();
+    setNotificationStatus(granted ? 'granted' : 'denied');
+  };
+
+  const updateSpeed = (exercise: keyof UserSettings['speeds'], value: SpeedValue) => {
+    setSettings(prev => ({
+      ...prev,
+      speeds: {
+        ...prev.speeds,
+        [exercise]: value,
+      },
+    }));
   };
 
   return (
@@ -40,29 +88,109 @@ export function SettingsModal() {
           <Settings className="w-6 h-6 text-muted-foreground" />
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-lg bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-foreground font-mono">Timer Settings</DialogTitle>
+          <DialogTitle className="text-foreground font-mono text-xl">Customize Your Breaks</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6 py-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-muted-foreground">Break reminder interval</label>
-              <span className="text-lg font-mono text-primary">Every {interval} min</span>
+        
+        <div className="space-y-8 py-4">
+          {/* Break Reminder Interval */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Break Reminder Interval
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-foreground">Reminder frequency</Label>
+                <span className="text-lg font-mono text-primary">Every {settings.breakIntervalMinutes} min</span>
+              </div>
+              <Slider
+                value={[settings.breakIntervalMinutes]}
+                onValueChange={(values) => setSettings(prev => ({ ...prev, breakIntervalMinutes: values[0] }))}
+                min={1}
+                max={30}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1 min (testing)</span>
+                <span>30 min</span>
+              </div>
             </div>
-            <Slider
-              value={[interval]}
-              onValueChange={(values) => setInterval(values[0])}
-              min={MIN_INTERVAL}
-              max={MAX_INTERVAL}
-              step={1}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{MIN_INTERVAL} min</span>
-              <span>{MAX_INTERVAL} min</span>
+          </section>
+
+          {/* Speed Settings */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Speed of Ball
+            </h3>
+            <div className="space-y-6">
+              <SpeedSlider
+                label="Vertical"
+                sublabel="Up-down movement"
+                value={settings.speeds.vertical}
+                onChange={(v) => updateSpeed('vertical', v)}
+              />
+              <SpeedSlider
+                label="Horizontal"
+                sublabel="Left-right movement"
+                value={settings.speeds.horizontal}
+                onChange={(v) => updateSpeed('horizontal', v)}
+              />
+              <SpeedSlider
+                label="Circular"
+                sublabel="Circular movement"
+                value={settings.speeds.circular}
+                onChange={(v) => updateSpeed('circular', v)}
+              />
+              <SpeedSlider
+                label="Diagonal 1"
+                sublabel="Top-left → bottom-right"
+                value={settings.speeds.diagonal1}
+                onChange={(v) => updateSpeed('diagonal1', v)}
+              />
+              <SpeedSlider
+                label="Diagonal 2"
+                sublabel="Top-right → bottom-left"
+                value={settings.speeds.diagonal2}
+                onChange={(v) => updateSpeed('diagonal2', v)}
+              />
             </div>
-          </div>
+          </section>
+
+          {/* Notifications */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Notifications
+            </h3>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/30">
+              <div className="flex items-center gap-3">
+                {notificationStatus === 'granted' ? (
+                  <Bell className="w-5 h-5 text-success" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm text-foreground">Background reminders</p>
+                  <p className="text-xs text-muted-foreground">
+                    {notificationStatus === 'granted' ? 'Enabled' : 
+                     notificationStatus === 'denied' ? 'Blocked' : 
+                     notificationStatus === 'unsupported' ? 'Not supported' : 'Not enabled'}
+                  </p>
+                </div>
+              </div>
+              {notificationStatus !== 'granted' && notificationStatus !== 'unsupported' && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleNotificationToggle}
+                >
+                  Enable
+                </Button>
+              )}
+            </div>
+          </section>
+
           <Button onClick={handleSave} className="w-full">
             Save Settings
           </Button>
@@ -71,3 +199,6 @@ export function SettingsModal() {
     </Dialog>
   );
 }
+
+// Export for backwards compatibility
+export { getBreakInterval } from '@/lib/settings';

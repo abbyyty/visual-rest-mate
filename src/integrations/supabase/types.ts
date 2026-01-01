@@ -19,6 +19,7 @@ export type Database = {
           close_eyes_count: number
           created_at: string
           date: string
+          emergency_stop_count: number
           exercise_count: number
           id: string
           skip_count: number
@@ -30,6 +31,7 @@ export type Database = {
           close_eyes_count?: number
           created_at?: string
           date: string
+          emergency_stop_count?: number
           exercise_count?: number
           id?: string
           skip_count?: number
@@ -41,6 +43,7 @@ export type Database = {
           close_eyes_count?: number
           created_at?: string
           date?: string
+          emergency_stop_count?: number
           exercise_count?: number
           id?: string
           skip_count?: number
