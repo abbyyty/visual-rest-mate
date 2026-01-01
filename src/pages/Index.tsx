@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame, Pause, RotateCcw, Info } from 'lucide-react';
+import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame, Pause, RotateCcw } from 'lucide-react';
 import { getTodayDate, formatTime } from '@/lib/userId';
 import { useDailyStats } from '@/hooks/useDailyStats';
 import { StatCard } from '@/components/StatCard';
@@ -9,7 +9,7 @@ import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
 import { SettingsModal, getBreakInterval } from '@/components/SettingsModal';
 import { playDingDing } from '@/lib/sound';
 import { toast } from 'sonner';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -494,12 +494,38 @@ const Index = () => {
           </section>
 
           {/* Stats Cards */}
-          <section className="grid grid-cols-1 md:grid-cols-4 gap-6" style={{ animationDelay: '0.1s' }}>
-            <StatCard icon={<Eye className="w-8 h-8" />} label="Eye exercises" value={stats?.exercise_count ?? 0} color="primary" />
-            <StatCard icon={<Moon className="w-8 h-8" />} label="Close eyes rest" value={stats?.close_eyes_count ?? 0} color="success" />
-            <StatCard icon={<SkipForward className="w-8 h-8" />} label="Skip breaks" value={stats?.skip_count ?? 0} color="warning" />
-            <StatCard icon={<AlertCircle className="w-8 h-8" />} label="Early Ends" value={earlyEnds} color="danger" />
-          </section>
+          <TooltipProvider>
+            <section className="grid grid-cols-1 md:grid-cols-4 gap-6" style={{ animationDelay: '0.1s' }}>
+              <StatCard 
+                icon={<Eye className="w-8 h-8" />} 
+                label="Eye exercises" 
+                value={stats?.exercise_count ?? 0} 
+                color="primary" 
+                tooltip="You will be guided to do eye muscle exercise with messages and sound. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded."
+              />
+              <StatCard 
+                icon={<Moon className="w-8 h-8" />} 
+                label="Close eyes rest" 
+                value={stats?.close_eyes_count ?? 0} 
+                color="success" 
+                tooltip="You will be guided to have 5 minutes eye-closing program for relaxation. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded."
+              />
+              <StatCard 
+                icon={<SkipForward className="w-8 h-8" />} 
+                label="Skip breaks" 
+                value={stats?.skip_count ?? 0} 
+                color="warning" 
+                tooltip="Redirect to the mainpage and timer restarts immediately from 0:00"
+              />
+              <StatCard 
+                icon={<AlertCircle className="w-8 h-8" />} 
+                label="Early Ends" 
+                value={earlyEnds} 
+                color="danger" 
+                tooltip="Counts of early ends"
+              />
+            </section>
+          </TooltipProvider>
 
           {/* Summary */}
           <section className="text-center text-muted-foreground text-lg" style={{ animationDelay: '0.2s' }}>
@@ -509,100 +535,13 @@ const Index = () => {
             </p>
           </section>
 
-          {/* Direct Exercise Button with Info Tooltips */}
-          <TooltipProvider>
-            <section className="text-center space-y-4" style={{ animationDelay: '0.3s' }}>
-              {/* Direct Start Exercise Button */}
-              <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3 mx-auto">
-                <Activity className="w-6 h-6" />
-                Direct Start Exercise
-              </button>
-              
-              {/* 4 Main Buttons with Info Tooltips */}
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                {/* Eye Exercise */}
-                <div className="relative inline-flex items-center">
-                  <button onClick={handleDirectExercise} className="btn-primary flex items-center gap-3">
-                    <Eye className="w-5 h-5" />
-                    Eye Exercise
-                  </button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
-                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-sm">
-                      <p>You will be guided to do eye muscle exercise with messages and sound. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                
-                {/* Eye Close Relax */}
-                <div className="relative inline-flex items-center">
-                  <button 
-                    onClick={() => {
-                      incrementCloseEyesCount();
-                      setShowBlackScreen(true);
-                    }} 
-                    className="btn-secondary flex items-center gap-3"
-                  >
-                    <Moon className="w-5 h-5" />
-                    Eye Close Relax
-                  </button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
-                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-sm">
-                      <p>You will be guided to have 5 minutes eye-closing program for relaxation. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                
-                {/* Skip */}
-                <div className="relative inline-flex items-center">
-                  <button 
-                    onClick={handleSkip} 
-                    className="btn-warning flex items-center gap-3"
-                  >
-                    <SkipForward className="w-5 h-5" />
-                    Skip
-                  </button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
-                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs">
-                      <p>Redirect to the mainpage and timer restarts immediately from 0:00</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                
-                {/* Early End */}
-                <div className="relative inline-flex items-center">
-                  <div className="btn-danger flex items-center gap-3 cursor-default">
-                    <AlertCircle className="w-5 h-5" />
-                    Early End: {earlyEnds}
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center transition-colors cursor-help text-xs">
-                        <Info className="w-2.5 h-2.5 text-muted-foreground" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs">
-                      <p>Counts of early ends</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-            </section>
-          </TooltipProvider>
+          {/* Direct Exercise Button */}
+          <section className="text-center" style={{ animationDelay: '0.3s' }}>
+            <button onClick={handleDirectExercise} className="btn-accent flex items-center gap-3 mx-auto">
+              <Activity className="w-6 h-6" />
+              Direct Start Exercise
+            </button>
+          </section>
         </div>
       </main>
 
