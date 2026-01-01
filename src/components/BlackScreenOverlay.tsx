@@ -34,14 +34,12 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     if (onEarlyEnd) {
       onEarlyEnd();
     }
-    
-    // Show encouragement then navigate with auto-start
-    setPhase('encouragement');
-    
-    setTimeout(() => {
-      onClose();
-      navigate('/', { state: { fromRelax: true } });
-    }, 2000);
+
+    toast.info('Early end recorded');
+
+    // No encouragement for early end
+    onClose();
+    navigate('/', { state: { fromRelax: true, earlyEnd: true } });
   }, [onClose, onEarlyEnd, navigate]);
 
   // Main resting timer

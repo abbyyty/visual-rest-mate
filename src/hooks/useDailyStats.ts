@@ -67,55 +67,83 @@ export function useDailyStats() {
     }
   }, [userId, today]);
 
-  const updateStats = useCallback(async (updates: Partial<DailyStats>) => {
-    const newStats = {
+  type StatsUpdate =
+    | Partial<DailyStats>
+    | ((current: DailyStats) => Partial<DailyStats>);
+
+  const getDefaultStats = useCallback(
+    (): DailyStats => ({
       user_id: userId,
       date: today,
-      total_screen_time_seconds: stats?.total_screen_time_seconds ?? 0,
-      exercise_count: stats?.exercise_count ?? 0,
-      close_eyes_count: stats?.close_eyes_count ?? 0,
-      skip_count: stats?.skip_count ?? 0,
-      early_end_count: stats?.early_end_count ?? 0,
-      overuse_time_seconds: stats?.overuse_time_seconds ?? 0,
-      ...updates,
-    };
+      total_screen_time_seconds: 0,
+      exercise_count: 0,
+      close_eyes_count: 0,
+      skip_count: 0,
+      early_end_count: 0,
+      overuse_time_seconds: 0,
+    }),
+    [userId, today]
+  );
 
-    setStats(newStats);
+  const updateStats = useCallback(
+    (updates: StatsUpdate) => {
+      setStats((prev) => {
+        const base = prev ?? getDefaultStats();
+        const patch = typeof updates === 'function' ? updates(base) : updates;
 
-    try {
-      const { error } = await supabase
-        .from('daily_stats')
-        .upsert(newStats, { onConflict: 'user_id,date' });
+        const next: DailyStats = {
+          ...base,
+          ...patch,
+          user_id: userId,
+          date: today,
+        };
 
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating stats:', error);
-    }
-  }, [userId, today, stats]);
+        // Persist (fire-and-forget); using functional setState ensures we never
+        // overwrite newer values when multiple updates happen quickly.
+        void supabase
+          .from('daily_stats')
+          .upsert(next, { onConflict: 'user_id,date' })
+          .then(({ error }) => {
+            if (error) console.error('Error updating stats:', error);
+          });
+
+        return next;
+      });
+    },
+    [userId, today, getDefaultStats]
+  );
 
   const incrementExerciseCount = useCallback(() => {
-    updateStats({ exercise_count: (stats?.exercise_count ?? 0) + 1 });
-  }, [updateStats, stats]);
+    updateStats((s) => ({ exercise_count: s.exercise_count + 1 }));
+  }, [updateStats]);
 
   const incrementCloseEyesCount = useCallback(() => {
-    updateStats({ close_eyes_count: (stats?.close_eyes_count ?? 0) + 1 });
-  }, [updateStats, stats]);
+    updateStats((s) => ({ close_eyes_count: s.close_eyes_count + 1 }));
+  }, [updateStats]);
 
   const incrementSkipCount = useCallback(() => {
-    updateStats({ skip_count: (stats?.skip_count ?? 0) + 1 });
-  }, [updateStats, stats]);
+    updateStats((s) => ({ skip_count: s.skip_count + 1 }));
+  }, [updateStats]);
 
-  const addScreenTime = useCallback((seconds: number) => {
-    updateStats({ total_screen_time_seconds: (stats?.total_screen_time_seconds ?? 0) + seconds });
-  }, [updateStats, stats]);
+  const addScreenTime = useCallback(
+    (seconds: number) => {
+      updateStats((s) => ({
+        total_screen_time_seconds: s.total_screen_time_seconds + seconds,
+      }));
+    },
+    [updateStats]
+  );
 
   const incrementEarlyEndCount = useCallback(() => {
-    updateStats({ early_end_count: (stats?.early_end_count ?? 0) + 1 });
-  }, [updateStats, stats]);
+    updateStats((s) => ({ early_end_count: s.early_end_count + 1 }));
+  }, [updateStats]);
 
-  const addOveruseTime = useCallback((seconds: number) => {
-    updateStats({ overuse_time_seconds: (stats?.overuse_time_seconds ?? 0) + seconds });
-  }, [updateStats, stats]);
+  const addOveruseTime = useCallback(
+    (seconds: number) => {
+      updateStats((s) => ({ overuse_time_seconds: s.overuse_time_seconds + seconds }));
+    },
+    [updateStats]
+  );
 
   useEffect(() => {
     fetchStats();

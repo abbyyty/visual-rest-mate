@@ -92,8 +92,9 @@ const EyeExercise = () => {
   const handleEarlyEnd = useCallback(() => {
     stopAllTimers();
     incrementEarlyEndCount();
-    setIsComplete(true); // Trigger encouragement flow
-  }, [stopAllTimers, incrementEarlyEndCount]);
+    toast.info('Early end recorded');
+    navigate('/', { state: { fromExercise: true, earlyEnd: true } });
+  }, [stopAllTimers, incrementEarlyEndCount, navigate]);
 
   // Auto-navigate after completion with encouragement
   useEffect(() => {
