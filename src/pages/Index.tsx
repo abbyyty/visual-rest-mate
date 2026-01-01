@@ -26,11 +26,11 @@ const Index = () => {
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
   const [showBreakPopup, setShowBreakPopup] = useState(false);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
-  const [currentOveruseSeconds, setCurrentOveruseSeconds] = useState(0);
+  const [sessionOveruseSeconds, setSessionOveruseSeconds] = useState(0); // Overuse since last reminder (for popup)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
-  const lastDingTimeRef = useRef(0);
+  const lastDingTimeRef = useRef(0); // When last ding occurred
 
   // Cleanup on unmount
   useEffect(() => {
@@ -75,7 +75,7 @@ const Index = () => {
       // Reset timer to 00:00:00
       console.log('🔄 Resetting timer to 00:00:00');
       setCurrentSessionTime(0);
-      setCurrentOveruseSeconds(0);
+      setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
       setIsRunning(true);
       
@@ -105,14 +105,17 @@ const Index = () => {
           if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
             console.log(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
             playDingDing();
+            
+            // Calculate session overuse = time since last ding (or 0 if first ding)
+            if (lastDingTimeRef.current > 0) {
+              // User ignored previous reminder - add that interval as session overuse
+              const overuseFromIgnore = breakIntervalSeconds;
+              setSessionOveruseSeconds(prev => prev + overuseFromIgnore);
+              console.log(`🔥 Added session overuse: ${formatTime(overuseFromIgnore)}`);
+            }
+            
             lastDingTimeRef.current = newTime;
             setShowBreakPopup(true);
-            
-            // Calculate overuse if this is not the first ding
-            if (newTime > breakIntervalSeconds) {
-              const overuse = breakIntervalSeconds; // Full interval added as overuse
-              setCurrentOveruseSeconds(prev => prev + overuse);
-            }
           }
           
           return newTime;
@@ -151,13 +154,13 @@ const Index = () => {
         return 0;
       });
       
-      // Save accumulated overuse
-      if (currentOveruseSeconds > 0) {
-        console.log(`💾 Saving overuse time: ${formatTime(currentOveruseSeconds)}`);
-        addOveruseTime(currentOveruseSeconds);
+      // Save accumulated session overuse to cumulative
+      if (sessionOveruseSeconds > 0) {
+        console.log(`💾 Saving overuse time: ${formatTime(sessionOveruseSeconds)}`);
+        addOveruseTime(sessionOveruseSeconds);
       }
       
-      setCurrentOveruseSeconds(0);
+      setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
       console.log('✅ Timer stopped and reset to 00:00:00');
     } catch (error) {
@@ -168,25 +171,27 @@ const Index = () => {
         timerRef.current = null;
       }
       setCurrentSessionTime(0);
-      setCurrentOveruseSeconds(0);
+      setSessionOveruseSeconds(0);
     }
-  }, [addScreenTime, addOveruseTime, currentOveruseSeconds]);
+  }, [addScreenTime, addOveruseTime, sessionOveruseSeconds]);
 
-  // Calculate overuse when user clicks late
-  const calculateAndSaveOveruse = useCallback(() => {
-    const breakIntervalSeconds = getBreakInterval() * 60;
+  // Calculate session overuse when user clicks (time since last ding)
+  const calculateSessionOveruse = useCallback(() => {
     const timeSinceLastDing = currentSessionTime - lastDingTimeRef.current;
     
-    // Only add overuse if user clicked after the first ding (not if they click at exactly the interval)
+    // Add time since last ding as session overuse
     if (timeSinceLastDing > 0 && lastDingTimeRef.current > 0) {
-      const overuseToAdd = timeSinceLastDing;
-      console.log(`🔥 Adding overuse: ${formatTime(overuseToAdd)}`);
-      setCurrentOveruseSeconds(prev => prev + overuseToAdd);
+      console.log(`🔥 Adding late response overuse: ${formatTime(timeSinceLastDing)}`);
+      setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
+      return timeSinceLastDing;
     }
+    return 0;
   }, [currentSessionTime]);
 
   const handleEyeExercise = useCallback(() => {
-    calculateAndSaveOveruse();
+    const lateOveruse = calculateSessionOveruse();
+    const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    
     setShowBreakPopup(false);
     incrementExerciseCount();
     
@@ -201,19 +206,22 @@ const Index = () => {
     if (currentSessionTime > 0) {
       addScreenTime(currentSessionTime);
     }
-    if (currentOveruseSeconds > 0) {
-      addOveruseTime(currentOveruseSeconds);
+    // Save session overuse to cumulative
+    if (totalSessionOveruse > 0) {
+      addOveruseTime(totalSessionOveruse);
     }
     
     setCurrentSessionTime(0);
-    setCurrentOveruseSeconds(0);
+    setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
     
     navigate('/eye-exercise');
-  }, [incrementExerciseCount, navigate, calculateAndSaveOveruse, currentSessionTime, currentOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementExerciseCount, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleCloseEyes = useCallback(() => {
-    calculateAndSaveOveruse();
+    const lateOveruse = calculateSessionOveruse();
+    const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    
     setShowBreakPopup(false);
     incrementCloseEyesCount();
     
@@ -228,28 +236,37 @@ const Index = () => {
     if (currentSessionTime > 0) {
       addScreenTime(currentSessionTime);
     }
-    if (currentOveruseSeconds > 0) {
-      addOveruseTime(currentOveruseSeconds);
+    // Save session overuse to cumulative
+    if (totalSessionOveruse > 0) {
+      addOveruseTime(totalSessionOveruse);
     }
     
     setCurrentSessionTime(0);
-    setCurrentOveruseSeconds(0);
+    setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
     
     setShowBlackScreen(true);
-  }, [incrementCloseEyesCount, calculateAndSaveOveruse, currentSessionTime, currentOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementCloseEyesCount, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleSkip = useCallback(() => {
-    calculateAndSaveOveruse();
+    const lateOveruse = calculateSessionOveruse();
+    const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    
+    // Save session overuse to cumulative on skip
+    if (totalSessionOveruse > 0) {
+      addOveruseTime(totalSessionOveruse);
+    }
+    
     setShowBreakPopup(false);
     incrementSkipCount();
     
     // Immediately restart current session timer from 0
     setCurrentSessionTime(0);
+    setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
     
     console.log('⏭️ Skip clicked - restarting timer from 0');
-  }, [incrementSkipCount, calculateAndSaveOveruse]);
+  }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime]);
 
   const handleDirectExercise = useCallback(() => {
     incrementExerciseCount();
@@ -263,7 +280,10 @@ const Index = () => {
   const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
   const totalHours = Math.floor(todaysTotalLive / 3600);
   const earlyEnds = stats?.early_end_count ?? 0;
-  const totalOveruseSeconds = (stats?.overuse_time_seconds ?? 0) + currentOveruseSeconds;
+  // Cumulative daily overuse from Supabase (not including current session yet)
+  const cumulativeOveruseSeconds = stats?.overuse_time_seconds ?? 0;
+  // Current session overuse for popup display
+  const currentSessionOveruse = sessionOveruseSeconds + (lastDingTimeRef.current > 0 ? currentSessionTime - lastDingTimeRef.current : 0);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -298,15 +318,15 @@ const Index = () => {
               </div>
             </div>
             
-            {/* Overuse Display (Red) */}
-            {totalOveruseSeconds > 0 && (
+            {/* Cumulative Daily Overuse Display (Red) */}
+            {cumulativeOveruseSeconds > 0 && (
               <div className="space-y-1">
                 <h3 className="text-destructive text-sm flex items-center justify-center gap-2">
                   <Flame className="w-4 h-4" />
-                  Overuse
+                  Overuse (Today)
                 </h3>
                 <div className="text-2xl font-mono text-destructive">
-                  {formatTime(totalOveruseSeconds)}
+                  {formatTime(cumulativeOveruseSeconds)}
                 </div>
               </div>
             )}
@@ -382,7 +402,7 @@ const Index = () => {
       <BreakPopup 
         open={showBreakPopup} 
         intervalMinutes={getBreakInterval()} 
-        overuseSeconds={currentOveruseSeconds}
+        overuseSeconds={currentSessionOveruse > 0 ? currentSessionOveruse : 0}
         onEyeExercise={handleEyeExercise} 
         onCloseEyes={handleCloseEyes} 
         onSkip={handleSkip} 
