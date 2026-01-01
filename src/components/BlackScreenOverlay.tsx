@@ -68,7 +68,6 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     if (!open) {
       setTimeRemaining(duration);
       setPhase('resting');
-      setCountdownValue(5);
     }
   }, [open, duration]);
 
