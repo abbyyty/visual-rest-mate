@@ -92,21 +92,6 @@ export function BlackScreenOverlay({ open, onClose, onEarlyEnd, duration = 300 }
     );
   }
 
-  // Countdown phase (resume work countdown)
-  if (phase === 'countdown') {
-    return (
-      <div className="black-screen-overlay">
-        <div className="text-center animate-fade-in">
-          <p className="text-foreground/80 text-2xl md:text-3xl mb-8">
-            Resume work in...
-          </p>
-          <div className="countdown-text text-accent">
-            {countdownValue}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Resting phase (main timer)
   return (
