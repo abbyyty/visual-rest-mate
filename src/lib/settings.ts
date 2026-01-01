@@ -1,19 +1,30 @@
-// User settings storage and retrieval
+// User settings storage and retrieval with validation
+import { z } from 'zod';
+import { devError } from './logger';
 
-export interface SpeedSetting {
-  slow: number;
-  normal: number;
-  fast: number;
-}
+const SpeedSettingSchema = z.enum(['slow', 'normal', 'fast']);
+
+const UserSettingsSchema = z.object({
+  breakIntervalMinutes: z.number().min(1).max(120),
+  speeds: z.object({
+    vertical: SpeedSettingSchema,
+    horizontal: SpeedSettingSchema,
+    circular: SpeedSettingSchema,
+    diagonal1: SpeedSettingSchema,
+    diagonal2: SpeedSettingSchema,
+  }),
+});
+
+export type SpeedSetting = z.infer<typeof SpeedSettingSchema>;
 
 export interface UserSettings {
   breakIntervalMinutes: number;
   speeds: {
-    vertical: 'slow' | 'normal' | 'fast';
-    horizontal: 'slow' | 'normal' | 'fast';
-    circular: 'slow' | 'normal' | 'fast';
-    diagonal1: 'slow' | 'normal' | 'fast';
-    diagonal2: 'slow' | 'normal' | 'fast';
+    vertical: SpeedSetting;
+    horizontal: SpeedSetting;
+    circular: SpeedSetting;
+    diagonal1: SpeedSetting;
+    diagonal2: SpeedSetting;
   };
 }
 
@@ -44,31 +55,39 @@ export function getUserSettings(): UserSettings {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      return {
-        breakIntervalMinutes: parsed.breakIntervalMinutes ?? DEFAULT_SETTINGS.breakIntervalMinutes,
-        speeds: {
-          vertical: parsed.speeds?.vertical ?? DEFAULT_SETTINGS.speeds.vertical,
-          horizontal: parsed.speeds?.horizontal ?? DEFAULT_SETTINGS.speeds.horizontal,
-          circular: parsed.speeds?.circular ?? DEFAULT_SETTINGS.speeds.circular,
-          diagonal1: parsed.speeds?.diagonal1 ?? DEFAULT_SETTINGS.speeds.diagonal1,
-          diagonal2: parsed.speeds?.diagonal2 ?? DEFAULT_SETTINGS.speeds.diagonal2,
-        },
-      };
+      // Validate with zod schema - use safeParse and fallback gracefully
+      const result = UserSettingsSchema.safeParse(parsed);
+      if (result.success) {
+        // Cast to UserSettings since zod schema matches our interface
+        return result.data as UserSettings;
+      }
+      // If validation fails, clear corrupted data
+      devError('Invalid settings data, using defaults');
+      localStorage.removeItem(STORAGE_KEY);
     }
   } catch (e) {
-    console.error('Error reading settings:', e);
+    devError('Error reading settings:', e);
+    // Clear corrupted data
+    localStorage.removeItem(STORAGE_KEY);
   }
   return DEFAULT_SETTINGS;
 }
 
 export function saveUserSettings(settings: UserSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  try {
+    // Validate before saving
+    const validated = UserSettingsSchema.parse(settings);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(validated));
+  } catch (e) {
+    devError('Invalid settings provided:', e);
+    throw new Error('Invalid settings format');
+  }
 }
 
 export function getBreakInterval(): number {
   return getUserSettings().breakIntervalMinutes;
 }
 
-export function getSpeedValue(exercise: keyof typeof SPEED_VALUES, setting: 'slow' | 'normal' | 'fast'): number {
+export function getSpeedValue(exercise: keyof typeof SPEED_VALUES, setting: SpeedSetting): number {
   return SPEED_VALUES[exercise][setting];
 }
