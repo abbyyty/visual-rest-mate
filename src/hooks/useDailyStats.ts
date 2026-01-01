@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getUserId, getTodayDate } from '@/lib/userId';
 import { devError } from '@/lib/logger';
@@ -19,6 +19,10 @@ export function useDailyStats() {
   const [stats, setStats] = useState<DailyStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // IMPORTANT: We keep a ref so updates can be persisted even if the component
+  // that calls updateStats unmounts right after triggering an update.
+  const statsRef = useRef<DailyStats | null>(null);
+
   const userId = getUserId();
   const today = getTodayDate();
 
@@ -34,13 +38,15 @@ export function useDailyStats() {
       if (error) throw error;
 
       if (data) {
-        setStats({
+        const next: DailyStats = {
           ...data,
           early_end_count: data.early_end_count ?? 0,
           overuse_time_seconds: data.overuse_time_seconds ?? 0,
-        });
+        };
+        statsRef.current = next;
+        setStats(next);
       } else {
-        setStats({
+        const next: DailyStats = {
           user_id: userId,
           date: today,
           total_screen_time_seconds: 0,
@@ -49,11 +55,13 @@ export function useDailyStats() {
           skip_count: 0,
           early_end_count: 0,
           overuse_time_seconds: 0,
-        });
+        };
+        statsRef.current = next;
+        setStats(next);
       }
     } catch (error) {
       devError('Error fetching stats:', error);
-      setStats({
+      const next: DailyStats = {
         user_id: userId,
         date: today,
         total_screen_time_seconds: 0,
@@ -62,7 +70,9 @@ export function useDailyStats() {
         skip_count: 0,
         early_end_count: 0,
         overuse_time_seconds: 0,
-      });
+      };
+      statsRef.current = next;
+      setStats(next);
     } finally {
       setLoading(false);
     }
@@ -88,28 +98,27 @@ export function useDailyStats() {
 
   const updateStats = useCallback(
     (updates: StatsUpdate) => {
-      setStats((prev) => {
-        const base = prev ?? getDefaultStats();
-        const patch = typeof updates === 'function' ? updates(base) : updates;
+      const base = statsRef.current ?? getDefaultStats();
+      const patch = typeof updates === 'function' ? updates(base) : updates;
 
-        const next: DailyStats = {
-          ...base,
-          ...patch,
-          user_id: userId,
-          date: today,
-        };
+      const next: DailyStats = {
+        ...base,
+        ...patch,
+        user_id: userId,
+        date: today,
+      };
 
-        // Persist (fire-and-forget); using functional setState ensures we never
-        // overwrite newer values when multiple updates happen quickly.
-        void supabase
-          .from('daily_stats')
-          .upsert(next, { onConflict: 'user_id,date' })
-          .then(({ error }) => {
-            if (error) devError('Error updating stats:', error);
-          });
+      // Update local cache immediately
+      statsRef.current = next;
+      setStats(next);
 
-        return next;
-      });
+      // Persist (fire-and-forget)
+      void supabase
+        .from('daily_stats')
+        .upsert(next, { onConflict: 'user_id,date' })
+        .then(({ error }) => {
+          if (error) devError('Error updating stats:', error);
+        });
     },
     [userId, today, getDefaultStats]
   );

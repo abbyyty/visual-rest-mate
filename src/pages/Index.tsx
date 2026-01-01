@@ -212,10 +212,11 @@ const Index = () => {
       // Auto-start timer after a short delay
       setTimeout(() => {
         handleStart();
+        autoStartTriggeredRef.current = false;
         if (!state?.earlyEnd) {
           toast.success('✅ Timer resumed - stay productive!');
         }
-      }, 1000);
+      }, 250);
     }
   }, [location.state, isRunning, navigate, handleStart]);
 
@@ -379,9 +380,35 @@ const Index = () => {
   }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
 
   const handleDirectExercise = useCallback(() => {
+    // Treat direct exercise like a break choice: persist current session, reset,
+    // then start the exercise. The timer will auto-resume on return.
+    const lateOveruse = calculateSessionOveruse();
+    const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+
     incrementExerciseCount();
+
+    // Stop timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRunning(false);
+    setIsPaused(false);
+
+    // Persist session
+    if (currentSessionTime > 0) {
+      addScreenTime(currentSessionTime);
+    }
+    if (totalSessionOveruse > 0) {
+      addOveruseTime(totalSessionOveruse);
+    }
+
+    setCurrentSessionTime(0);
+    setSessionOveruseSeconds(0);
+    lastDingTimeRef.current = 0;
+
     navigate('/eye-exercise');
-  }, [incrementExerciseCount, navigate]);
+  }, [incrementExerciseCount, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   // Today's total base from Supabase (accumulated sessions)
   const todaysTotalBase = stats?.total_screen_time_seconds ?? 0;
