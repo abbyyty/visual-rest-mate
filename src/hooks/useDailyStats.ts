@@ -11,6 +11,7 @@ export interface DailyStats {
   close_eyes_count: number;
   skip_count: number;
   early_end_count: number;
+  overuse_time_seconds: number;
 }
 
 export function useDailyStats() {
@@ -35,6 +36,7 @@ export function useDailyStats() {
         setStats({
           ...data,
           early_end_count: data.early_end_count ?? 0,
+          overuse_time_seconds: data.overuse_time_seconds ?? 0,
         });
       } else {
         setStats({
@@ -45,6 +47,7 @@ export function useDailyStats() {
           close_eyes_count: 0,
           skip_count: 0,
           early_end_count: 0,
+          overuse_time_seconds: 0,
         });
       }
     } catch (error) {
@@ -57,6 +60,7 @@ export function useDailyStats() {
         close_eyes_count: 0,
         skip_count: 0,
         early_end_count: 0,
+        overuse_time_seconds: 0,
       });
     } finally {
       setLoading(false);
@@ -72,6 +76,7 @@ export function useDailyStats() {
       close_eyes_count: stats?.close_eyes_count ?? 0,
       skip_count: stats?.skip_count ?? 0,
       early_end_count: stats?.early_end_count ?? 0,
+      overuse_time_seconds: stats?.overuse_time_seconds ?? 0,
       ...updates,
     };
 
@@ -108,6 +113,10 @@ export function useDailyStats() {
     updateStats({ early_end_count: (stats?.early_end_count ?? 0) + 1 });
   }, [updateStats, stats]);
 
+  const addOveruseTime = useCallback((seconds: number) => {
+    updateStats({ overuse_time_seconds: (stats?.overuse_time_seconds ?? 0) + seconds });
+  }, [updateStats, stats]);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -120,6 +129,7 @@ export function useDailyStats() {
     incrementSkipCount,
     addScreenTime,
     incrementEarlyEndCount,
+    addOveruseTime,
     refetch: fetchStats,
   };
 }
