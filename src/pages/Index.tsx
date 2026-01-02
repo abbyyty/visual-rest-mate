@@ -13,6 +13,62 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { devLog, devWarn, devError } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
 
+type TimerSnapshot = {
+  currentSessionTime: number;
+  sessionOveruseSeconds: number;
+  lastDingTime: number;
+  wasRunning: boolean;
+  wasPaused: boolean;
+  savedAt: number;
+};
+
+const TIMER_SNAPSHOT_KEY = 'timer_snapshot_v1';
+
+function saveTimerSnapshot(snapshot: TimerSnapshot) {
+  try {
+    sessionStorage.setItem(TIMER_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore
+  }
+}
+
+function loadTimerSnapshot(): TimerSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(TIMER_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<TimerSnapshot>;
+
+    if (
+      typeof parsed.currentSessionTime !== 'number' ||
+      typeof parsed.sessionOveruseSeconds !== 'number' ||
+      typeof parsed.lastDingTime !== 'number' ||
+      typeof parsed.wasRunning !== 'boolean' ||
+      typeof parsed.wasPaused !== 'boolean'
+    ) {
+      return null;
+    }
+
+    return {
+      currentSessionTime: parsed.currentSessionTime,
+      sessionOveruseSeconds: parsed.sessionOveruseSeconds,
+      lastDingTime: parsed.lastDingTime,
+      wasRunning: parsed.wasRunning,
+      wasPaused: parsed.wasPaused,
+      savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearTimerSnapshot() {
+  try {
+    sessionStorage.removeItem(TIMER_SNAPSHOT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -226,6 +282,79 @@ const Index = () => {
     }
   }, [location.state, isRunning, navigate, handleStart]);
 
+  // Resume the timer after viewing /data (without resetting)
+  useEffect(() => {
+    const state = location.state as { fromData?: boolean } | null;
+    if (!state?.fromData) return;
+
+    const snapshot = loadTimerSnapshot();
+    clearTimerSnapshot();
+
+    // Clear the navigation state to prevent re-triggering
+    navigate('/', { replace: true, state: {} });
+
+    if (!snapshot) return;
+
+    setShowBreakPopup(false);
+    setShowBlackScreen(false);
+
+    setCurrentSessionTime(snapshot.currentSessionTime);
+    setSessionOveruseSeconds(snapshot.sessionOveruseSeconds);
+    lastDingTimeRef.current = snapshot.lastDingTime;
+
+    if (!snapshot.wasRunning) {
+      setIsRunning(false);
+      setIsPaused(snapshot.wasPaused);
+      return;
+    }
+
+    // Resume ticking exactly where we left off
+    const breakIntervalSeconds = getBreakInterval() * 60;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    setIsPaused(false);
+    setIsRunning(true);
+
+    timerRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
+
+      setCurrentSessionTime((prev) => {
+        const newTime = prev + 1;
+
+        if (newTime % 10 === 0) {
+          devLog(`⏱️ Timer: ${formatTime(newTime)}`);
+        }
+
+        if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
+          devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
+          playDingDing();
+
+          const timeSinceLastDing = lastDingTimeRef.current > 0 ? newTime - lastDingTimeRef.current : 0;
+
+          if (timeSinceLastDing > 0) {
+            devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
+            setSessionOveruseSeconds((prevOveruse) => prevOveruse + timeSinceLastDing);
+          }
+
+          lastDingTimeRef.current = newTime;
+          setShowBreakPopup(true);
+        }
+
+        return newTime;
+      });
+    }, 1000);
+  }, [location.state, navigate]);
+
   const handlePause = useCallback(() => {
     try {
       devLog('⏸️ PAUSE clicked!');
@@ -432,6 +561,30 @@ const Index = () => {
       ? Math.max(0, currentSessionTime - lastDingTimeRef.current)
       : 0);
 
+  const handleViewData = useCallback(() => {
+    saveTimerSnapshot({
+      currentSessionTime,
+      sessionOveruseSeconds,
+      lastDingTime: lastDingTimeRef.current,
+      wasRunning: isRunning,
+      wasPaused: isPaused,
+      savedAt: Date.now(),
+    });
+
+    // Pause timer while on the data page (but keep the session time)
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    setShowBreakPopup(false);
+
+    if (isRunning) {
+      setIsRunning(false);
+      setIsPaused(true);
+    }
+  }, [currentSessionTime, sessionOveruseSeconds, isRunning, isPaused]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
@@ -451,7 +604,11 @@ const Index = () => {
                 Welcome, <span className="text-foreground">{username}</span>
               </span>
             )}
-            <Link to="/data" className="btn-secondary py-2 px-4 flex items-center gap-2">
+            <Link
+              to="/data"
+              onClick={handleViewData}
+              className="btn-secondary py-2 px-4 flex items-center gap-2"
+            >
               <BarChart3 className="w-4 h-4" />
               View My Data
             </Link>

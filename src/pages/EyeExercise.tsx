@@ -6,7 +6,7 @@ import { ExerciseDot } from '@/components/ExerciseDot';
 import { formatMinutesSeconds } from '@/lib/userId';
 import { playStartSound, playOpenEyesSound, playEndSound } from '@/lib/sound';
 import { getUserSettings, getSpeedValue } from '@/lib/settings';
-import { useDailyStats } from '@/hooks/useDailyStats';
+import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { Button } from '@/components/ui/button';
 
 type ExercisePhase = 
@@ -61,7 +61,7 @@ const buildExerciseSequence = (): PhaseConfig[] => {
 
 const EyeExercise = () => {
   const navigate = useNavigate();
-  const { incrementEarlyEndCount, flush } = useDailyStats();
+  const { incrementEyeExerciseEarlyEnd, flush } = useDailyTracking();
   
   const [exerciseSequence, setExerciseSequence] = useState<PhaseConfig[]>([]);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -94,12 +94,12 @@ const EyeExercise = () => {
 
     // Ensure the early-end increment is persisted before we navigate away,
     // otherwise a fast refetch on the next page can overwrite it.
-    incrementEarlyEndCount();
+    incrementEyeExerciseEarlyEnd();
     await flush();
 
     toast.info('Early end recorded');
     navigate('/', { state: { fromExercise: true, earlyEnd: true } });
-  }, [stopAllTimers, incrementEarlyEndCount, flush, navigate]);
+  }, [stopAllTimers, incrementEyeExerciseEarlyEnd, flush, navigate]);
 
   // Auto-navigate after completion with encouragement
   useEffect(() => {
