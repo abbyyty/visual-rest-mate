@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { devError } from '@/lib/logger';
 
 interface DailyTrackingRow {
   id: string;
@@ -102,7 +103,7 @@ const Data = () => {
 
       if (error) {
         toast.error('Failed to load data');
-        console.error(error);
+        devError('Failed to load data:', error);
       } else {
         // Cast interval types to string
         const typedRows: DailyTrackingRow[] = (rows || []).map(row => ({
