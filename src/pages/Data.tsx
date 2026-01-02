@@ -66,11 +66,15 @@ function formatDate(dateStr: string): string {
 }
 
 const COLORS = {
-  primary: 'hsl(175, 50%, 45%)',
-  success: 'hsl(160, 60%, 45%)',
-  warning: 'hsl(38, 90%, 55%)',
-  destructive: 'hsl(0, 72%, 51%)',
-  muted: 'hsl(220, 15%, 35%)',
+  // Screen Time
+  normalUse: 'hsl(160, 60%, 45%)',       // Green
+  overuse: 'hsl(0, 72%, 51%)',           // Red
+  // Sessions - color families
+  eyeExerciseFull: 'hsl(160, 60%, 35%)', // Dark green
+  eyeExerciseEarly: 'hsl(160, 50%, 55%)',// Light green
+  eyeCloseFull: 'hsl(200, 70%, 45%)',    // Dark blue
+  eyeCloseEarly: 'hsl(200, 60%, 65%)',   // Light blue
+  skip: 'hsl(38, 90%, 55%)',             // Orange
 };
 
 const Data = () => {
@@ -148,23 +152,63 @@ const Data = () => {
   const normalUseSeconds = Math.max(0, screenTimeSeconds - overuseSeconds);
 
   const screenTimePieData = [
-    { name: 'Normal Use', value: normalUseSeconds, color: COLORS.success },
-    { name: 'Overuse', value: overuseSeconds, color: COLORS.destructive },
+    { name: 'Normal Use', value: normalUseSeconds, color: COLORS.normalUse },
+    { name: 'Overuse', value: overuseSeconds, color: COLORS.overuse },
   ].filter(d => d.value > 0);
 
-  // Sessions Pie Chart Data
-  const eyeExercise = todayData?.daily_sessions_eye_exercise ?? 0;
-  const eyeClose = todayData?.daily_sessions_eye_close ?? 0;
+  const screenTimeTotal = screenTimePieData.reduce((sum, d) => sum + d.value, 0);
+
+  // Sessions Pie Chart Data - 5 slices with color families
+  const eyeExerciseFull = todayData?.daily_sessions_eye_exercise ?? 0;
+  const eyeExerciseEarly = todayData?.daily_sessions_eye_exercise_early_end ?? 0;
+  const eyeCloseFull = todayData?.daily_sessions_eye_close ?? 0;
+  const eyeCloseEarly = todayData?.daily_sessions_eye_close_early_end ?? 0;
   const skip = todayData?.daily_sessions_skip ?? 0;
-  const earlyEnd = (todayData?.daily_sessions_eye_exercise_early_end ?? 0) + 
-                   (todayData?.daily_sessions_eye_close_early_end ?? 0);
 
   const sessionsPieData = [
-    { name: 'Eye Exercise', value: eyeExercise, color: COLORS.primary },
-    { name: 'Eye Close', value: eyeClose, color: COLORS.success },
-    { name: 'Skip', value: skip, color: COLORS.warning },
-    { name: 'Early End', value: earlyEnd, color: COLORS.destructive },
+    { name: 'Full Eye Exercise', value: eyeExerciseFull, color: COLORS.eyeExerciseFull },
+    { name: 'Early End EE', value: eyeExerciseEarly, color: COLORS.eyeExerciseEarly },
+    { name: 'Full Eye Close', value: eyeCloseFull, color: COLORS.eyeCloseFull },
+    { name: 'Early End EC', value: eyeCloseEarly, color: COLORS.eyeCloseEarly },
+    { name: 'Skip', value: skip, color: COLORS.skip },
   ].filter(d => d.value > 0);
+
+  const sessionsTotal = sessionsPieData.reduce((sum, d) => sum + d.value, 0);
+
+  // Custom label renderer for percentage inside slices
+  const renderPercentLabel = (total: number) => ({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const percent = Math.round((value / total) * 100);
+    
+    if (percent < 5) return null; // Don't show label for tiny slices
+    
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}>
+        {percent}%
+      </text>
+    );
+  };
+
+  // Custom legend renderer - color block + label only (no numbers)
+  const renderLegend = (props: any) => {
+    const { payload } = props;
+    return (
+      <div className="flex flex-wrap justify-center gap-4 mt-4">
+        {payload.map((entry: any, index: number) => (
+          <div key={`legend-${index}`} className="flex items-center gap-2">
+            <div 
+              className="w-3 h-3 rounded-sm" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-sm text-muted-foreground">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const formatTimeLabel = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -229,44 +273,35 @@ const Data = () => {
           <div className="stat-card">
             <h3 className="text-lg font-mono text-foreground mb-4 text-center">Screen Time Distribution</h3>
             {screenTimePieData.length > 0 ? (
-              <div className="h-64">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={screenTimePieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
+                      innerRadius={50}
+                      outerRadius={85}
+                      paddingAngle={2}
                       dataKey="value"
-                      label={({ name, value }) => `${name}: ${formatTimeLabel(value)}`}
+                      label={renderPercentLabel(screenTimeTotal)}
                       labelLine={false}
                     >
                       {screenTimePieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => formatTimeLabel(value)}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(220, 15%, 12%)', 
-                        border: '1px solid hsl(220, 15%, 20%)',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Legend />
+                    <Legend content={renderLegend} verticalAlign="bottom" />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="h-56 flex items-center justify-center text-muted-foreground">
                 No screen time data for today
               </div>
             )}
-            <p className="text-center text-muted-foreground mt-4">
+            <p className="text-center text-muted-foreground mt-2 text-sm">
               Today: {formatTimeLabel(screenTimeSeconds)} total
-              {overuseSeconds > 0 && `, ${formatTimeLabel(overuseSeconds)} overuse`}
             </p>
           </div>
 
@@ -274,37 +309,30 @@ const Data = () => {
           <div className="stat-card">
             <h3 className="text-lg font-mono text-foreground mb-4 text-center">Session Types</h3>
             {sessionsPieData.length > 0 ? (
-              <div className="h-64">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={sessionsPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
+                      innerRadius={50}
+                      outerRadius={85}
+                      paddingAngle={2}
                       dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
+                      label={renderPercentLabel(sessionsTotal)}
                       labelLine={false}
                     >
                       {sessionsPieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(220, 15%, 12%)', 
-                        border: '1px solid hsl(220, 15%, 20%)',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Legend />
+                    <Legend content={renderLegend} verticalAlign="bottom" />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="h-56 flex items-center justify-center text-muted-foreground">
                 No session data for today
               </div>
             )}
