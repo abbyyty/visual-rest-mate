@@ -180,7 +180,11 @@ const Data = () => {
       {/* Header */}
       <header className="py-6 px-8 border-b border-border/30">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            to="/"
+            state={{ fromData: true }}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
             Back to Timer
           </Link>
