@@ -196,14 +196,14 @@ const Data = () => {
   const renderLegend = (props: any) => {
     const { payload } = props;
     return (
-      <div className="flex flex-wrap justify-center gap-4 mt-4">
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
         {payload.map((entry: any, index: number) => (
-          <div key={`legend-${index}`} className="flex items-center gap-2">
+          <div key={`legend-${index}`} className="flex items-center gap-1.5">
             <div 
-              className="w-3 h-3 rounded-sm" 
+              className="w-2.5 h-2.5 rounded-sm flex-shrink-0" 
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm text-muted-foreground">{entry.value}</span>
+            <span className="text-xs text-muted-foreground">{entry.value}</span>
           </div>
         ))}
       </div>
