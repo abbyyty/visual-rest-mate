@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, Moon, SkipForward, Play, Square, Activity, AlertCircle, Flame, Pause, RotateCcw } from 'lucide-react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Eye, Moon, SkipForward, Play, Activity, AlertCircle, Flame, Pause, RotateCcw, BarChart3, LogOut } from 'lucide-react';
 import { getTodayDate, formatTime } from '@/lib/userId';
-import { useDailyStats } from '@/hooks/useDailyStats';
+import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { StatCard } from '@/components/StatCard';
 import { BreakPopup } from '@/components/BreakPopup';
 import { BlackScreenOverlay } from '@/components/BlackScreenOverlay';
@@ -11,20 +11,26 @@ import { playDingDing } from '@/lib/sound';
 import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { devLog, devWarn, devError } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { signOut, username } = useAuth();
   const {
-    stats,
+    tracking,
     loading,
-    incrementExerciseCount,
-    incrementCloseEyesCount,
-    incrementSkipCount,
+    incrementEyeExercise,
+    incrementEyeClose,
+    incrementSkip,
     addScreenTime,
-    incrementEarlyEndCount,
-    addOveruseTime
-  } = useDailyStats();
+    incrementEyeExerciseEarlyEnd,
+    incrementEyeCloseEarlyEnd,
+    addOveruseTime,
+    getScreenTimeSeconds,
+    getOveruseTimeSeconds,
+    flush
+  } = useDailyTracking();
   
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -301,7 +307,7 @@ const Index = () => {
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
     
     setShowBreakPopup(false);
-    incrementExerciseCount();
+    incrementEyeExercise();
     
     // Pause timer - will restart when returning
     if (timerRef.current) {
@@ -324,14 +330,14 @@ const Index = () => {
     lastDingTimeRef.current = 0;
     
     navigate('/eye-exercise');
-  }, [incrementExerciseCount, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeExercise, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleCloseEyes = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
     
     setShowBreakPopup(false);
-    incrementCloseEyesCount();
+    incrementEyeClose();
     
     // Pause timer - will restart when returning
     if (timerRef.current) {
@@ -354,7 +360,7 @@ const Index = () => {
     lastDingTimeRef.current = 0;
     
     setShowBlackScreen(true);
-  }, [incrementCloseEyesCount, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeClose, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleSkip = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
@@ -369,7 +375,7 @@ const Index = () => {
     }
 
     setShowBreakPopup(false);
-    incrementSkipCount();
+    incrementSkip();
 
     // Immediately restart current session timer from 0
     setCurrentSessionTime(0);
@@ -377,7 +383,7 @@ const Index = () => {
     lastDingTimeRef.current = 0;
 
     devLog('⏭️ Skip clicked - restarting timer from 0');
-  }, [incrementSkipCount, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
+  }, [incrementSkip, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
 
   const handleDirectExercise = useCallback(() => {
     // Treat direct exercise like a break choice: persist current session, reset,
@@ -385,7 +391,7 @@ const Index = () => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
 
-    incrementExerciseCount();
+    incrementEyeExercise();
 
     // Stop timer
     if (timerRef.current) {
@@ -408,17 +414,17 @@ const Index = () => {
     lastDingTimeRef.current = 0;
 
     navigate('/eye-exercise');
-  }, [incrementExerciseCount, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeExercise, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
-  // Today's total base from Supabase (accumulated sessions)
-  const todaysTotalBase = stats?.total_screen_time_seconds ?? 0;
+  // Today's total base from database (accumulated sessions)
+  const todaysTotalBase = getScreenTimeSeconds();
   // Live today's total = base + current session time (running or paused)
   const todaysTotalLive = todaysTotalBase + ((isRunning || isPaused) ? currentSessionTime : 0);
-  const totalBreaks = (stats?.exercise_count ?? 0) + (stats?.close_eyes_count ?? 0);
+  const totalBreaks = (tracking?.daily_sessions_eye_exercise ?? 0) + (tracking?.daily_sessions_eye_close ?? 0);
   const totalHours = Math.floor(todaysTotalLive / 3600);
-  const earlyEnds = stats?.early_end_count ?? 0;
-  // Cumulative daily overuse from Supabase (not including current session yet)
-  const cumulativeOveruseSeconds = stats?.overuse_time_seconds ?? 0;
+  const earlyEnds = (tracking?.daily_sessions_eye_exercise_early_end ?? 0) + (tracking?.daily_sessions_eye_close_early_end ?? 0);
+  // Cumulative daily overuse from database (not including current session yet)
+  const cumulativeOveruseSeconds = getOveruseTimeSeconds();
   // Current session overuse for popup display
   const currentSessionOveruse =
     sessionOveruseSeconds +
@@ -426,14 +432,36 @@ const Index = () => {
       ? Math.max(0, currentSessionTime - lastDingTimeRef.current)
       : 0);
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header with Date */}
+      {/* Header with Date and User */}
       <header className="py-6 px-8 border-b border-border/30">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <p className="text-muted-foreground text-lg font-mono">
             Today's Date: <span className="text-foreground">{getTodayDate()}</span>
           </p>
+          <div className="flex items-center gap-4">
+            {username && (
+              <span className="text-muted-foreground">
+                Welcome, <span className="text-foreground">{username}</span>
+              </span>
+            )}
+            <Link to="/data" className="btn-secondary py-2 px-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              View My Data
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className="text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -540,21 +568,21 @@ const Index = () => {
               <StatCard 
                 icon={<Eye className="w-8 h-8" />} 
                 label="Eye exercises" 
-                value={stats?.exercise_count ?? 0} 
+                value={tracking?.daily_sessions_eye_exercise ?? 0} 
                 color="primary" 
                 tooltip="You will be guided to do eye muscle exercise with messages and sound. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded."
               />
               <StatCard 
                 icon={<Moon className="w-8 h-8" />} 
                 label="Close eyes rest" 
-                value={stats?.close_eyes_count ?? 0} 
+                value={tracking?.daily_sessions_eye_close ?? 0} 
                 color="success" 
                 tooltip="You will be guided to have 5 minutes eye-closing program for relaxation. Timer will be started automatically afterwards. You can leave early under emergency condition and this will be recorded."
               />
               <StatCard 
                 icon={<SkipForward className="w-8 h-8" />} 
                 label="Skip breaks" 
-                value={stats?.skip_count ?? 0} 
+                value={tracking?.daily_sessions_skip ?? 0} 
                 color="warning" 
                 tooltip="Redirect to the mainpage and timer restarts immediately from 0:00"
               />
@@ -597,11 +625,11 @@ const Index = () => {
         onSkip={handleSkip} 
       />
 
-      {/* Black Screen Overlay */}
+      {/* Black Screen Overlay - with separate early end handlers for exercise vs close */}
       <BlackScreenOverlay 
         open={showBlackScreen} 
         onClose={() => setShowBlackScreen(false)} 
-        onEarlyEnd={incrementEarlyEndCount}
+        onEarlyEnd={incrementEyeCloseEarlyEnd}
       />
     </div>
   );

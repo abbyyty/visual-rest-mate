@@ -56,6 +56,78 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_tracking: {
+        Row: {
+          created_at: string
+          daily_overuse_time: unknown
+          daily_screen_time: unknown
+          daily_sessions_count: number
+          daily_sessions_eye_close: number
+          daily_sessions_eye_close_early_end: number
+          daily_sessions_eye_exercise: number
+          daily_sessions_eye_exercise_early_end: number
+          daily_sessions_skip: number
+          date: string
+          days_of_use: number
+          id: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          daily_overuse_time?: unknown
+          daily_screen_time?: unknown
+          daily_sessions_count?: number
+          daily_sessions_eye_close?: number
+          daily_sessions_eye_close_early_end?: number
+          daily_sessions_eye_exercise?: number
+          daily_sessions_eye_exercise_early_end?: number
+          daily_sessions_skip?: number
+          date?: string
+          days_of_use?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          daily_overuse_time?: unknown
+          daily_screen_time?: unknown
+          daily_sessions_count?: number
+          daily_sessions_eye_close?: number
+          daily_sessions_eye_close_early_end?: number
+          daily_sessions_eye_exercise?: number
+          daily_sessions_eye_exercise_early_end?: number
+          daily_sessions_skip?: number
+          date?: string
+          days_of_use?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
