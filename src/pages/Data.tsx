@@ -158,22 +158,36 @@ const Data = () => {
 
   const screenTimeTotal = screenTimePieData.reduce((sum, d) => sum + d.value, 0);
 
-  // Sessions Pie Chart Data - 5 slices with color families
+  // Sessions Data - separate into 3 pie charts
   const eyeExerciseFull = todayData?.daily_sessions_eye_exercise ?? 0;
   const eyeExerciseEarly = todayData?.daily_sessions_eye_exercise_early_end ?? 0;
   const eyeCloseFull = todayData?.daily_sessions_eye_close ?? 0;
   const eyeCloseEarly = todayData?.daily_sessions_eye_close_early_end ?? 0;
   const skip = todayData?.daily_sessions_skip ?? 0;
 
-  const sessionsPieData = [
-    { name: 'Full Eye Exercise', value: eyeExerciseFull, color: COLORS.eyeExerciseFull },
-    { name: 'Early End EE', value: eyeExerciseEarly, color: COLORS.eyeExerciseEarly },
-    { name: 'Full Eye Close', value: eyeCloseFull, color: COLORS.eyeCloseFull },
-    { name: 'Early End EC', value: eyeCloseEarly, color: COLORS.eyeCloseEarly },
+  // Pie 1: Choices - Eye Exercise vs Eye Close vs Skip
+  const totalEyeExercise = eyeExerciseFull + eyeExerciseEarly;
+  const totalEyeClose = eyeCloseFull + eyeCloseEarly;
+  const choicesPieData = [
+    { name: 'Eye Exercise', value: totalEyeExercise, color: COLORS.eyeExerciseFull },
+    { name: 'Eye Close', value: totalEyeClose, color: COLORS.eyeCloseFull },
     { name: 'Skip', value: skip, color: COLORS.skip },
   ].filter(d => d.value > 0);
+  const choicesTotal = choicesPieData.reduce((sum, d) => sum + d.value, 0);
 
-  const sessionsTotal = sessionsPieData.reduce((sum, d) => sum + d.value, 0);
+  // Pie 2: Eye Exercise Completion - Full vs Early End
+  const eyeExCompletionData = [
+    { name: 'Full', value: eyeExerciseFull, color: COLORS.eyeExerciseFull },
+    { name: 'Early End', value: eyeExerciseEarly, color: COLORS.overuse },
+  ].filter(d => d.value > 0);
+  const eyeExTotal = eyeExCompletionData.reduce((sum, d) => sum + d.value, 0);
+
+  // Pie 3: Eye Close Completion - Full vs Early End
+  const eyeCloseCompletionData = [
+    { name: 'Full', value: eyeCloseFull, color: COLORS.eyeCloseFull },
+    { name: 'Early End', value: eyeCloseEarly, color: COLORS.overuse },
+  ].filter(d => d.value > 0);
+  const eyeCloseTotal = eyeCloseCompletionData.reduce((sum, d) => sum + d.value, 0);
 
   // Custom label renderer for percentage inside slices
   const renderPercentLabel = (total: number) => ({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) => {
@@ -305,37 +319,112 @@ const Data = () => {
             </p>
           </div>
 
-          {/* Sessions Pie */}
-          <div className="stat-card">
-            <h3 className="text-lg font-mono text-foreground mb-4 text-center">Session Types</h3>
-            {sessionsPieData.length > 0 ? (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={sessionsPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={85}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={renderPercentLabel(sessionsTotal)}
-                      labelLine={false}
-                    >
-                      {sessionsPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Legend content={renderLegend} verticalAlign="bottom" />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-56 flex items-center justify-center text-muted-foreground">
-                No session data for today
-              </div>
-            )}
+        </section>
+
+        {/* 3 Small Session Pies - Triangle Layout */}
+        <section className="space-y-6">
+          {/* Top: Choices (centered, wider) */}
+          <div className="flex justify-center">
+            <div className="stat-card w-full max-w-md">
+              <h3 className="text-base font-mono text-foreground mb-2 text-center">Choices</h3>
+              {choicesPieData.length > 0 ? (
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={choicesPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={60}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={renderPercentLabel(choicesTotal)}
+                        labelLine={false}
+                      >
+                        {choicesPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Legend content={renderLegend} verticalAlign="bottom" />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">
+                  No session data
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom: Two smaller pies side by side */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Eye Exercise Completion */}
+            <div className="stat-card">
+              <h3 className="text-sm font-mono text-foreground mb-2 text-center">Eye Exercise Completion</h3>
+              {eyeExCompletionData.length > 0 ? (
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={eyeExCompletionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={28}
+                        outerRadius={50}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={renderPercentLabel(eyeExTotal)}
+                        labelLine={false}
+                      >
+                        {eyeExCompletionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Legend content={renderLegend} verticalAlign="bottom" />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-36 flex items-center justify-center text-muted-foreground text-sm">
+                  No eye exercise data
+                </div>
+              )}
+            </div>
+
+            {/* Eye Close Completion */}
+            <div className="stat-card">
+              <h3 className="text-sm font-mono text-foreground mb-2 text-center">Eye Close Completion</h3>
+              {eyeCloseCompletionData.length > 0 ? (
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={eyeCloseCompletionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={28}
+                        outerRadius={50}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={renderPercentLabel(eyeCloseTotal)}
+                        labelLine={false}
+                      >
+                        {eyeCloseCompletionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Legend content={renderLegend} verticalAlign="bottom" />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-36 flex items-center justify-center text-muted-foreground text-sm">
+                  No eye close data
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
