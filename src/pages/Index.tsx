@@ -551,7 +551,9 @@ const Index = () => {
   const todaysTotalLive = todaysTotalBase + ((isRunning || isPaused) ? currentSessionTime : 0);
   const totalBreaks = (tracking?.daily_sessions_eye_exercise ?? 0) + (tracking?.daily_sessions_eye_close ?? 0);
   const totalHours = Math.floor(todaysTotalLive / 3600);
-  const earlyEnds = (tracking?.daily_sessions_eye_exercise_early_end ?? 0) + (tracking?.daily_sessions_eye_close_early_end ?? 0);
+  const eyeExerciseEarlyEnds = tracking?.daily_sessions_eye_exercise_early_end ?? 0;
+  const eyeCloseEarlyEnds = tracking?.daily_sessions_eye_close_early_end ?? 0;
+  const earlyEnds = eyeExerciseEarlyEnds + eyeCloseEarlyEnds;
   // Cumulative daily overuse from database (not including current session yet)
   const cumulativeOveruseSeconds = getOveruseTimeSeconds();
   // Current session overuse for popup display
@@ -748,7 +750,13 @@ const Index = () => {
                 label="Early Ends" 
                 value={earlyEnds} 
                 color="danger" 
-                tooltip="Counts of early ends"
+                tooltip="Counts of early ends from Eye Exercise and Eye Close sessions"
+                breakdown={{
+                  label1: 'Eye Exercise',
+                  value1: eyeExerciseEarlyEnds,
+                  label2: 'Eye Close',
+                  value2: eyeCloseEarlyEnds,
+                }}
               />
             </section>
           </TooltipProvider>

@@ -8,6 +8,13 @@ interface StatCardProps {
   value: number;
   color: 'primary' | 'success' | 'warning' | 'danger';
   tooltip?: string;
+  // For Early Ends card with breakdown
+  breakdown?: {
+    label1: string;
+    value1: number;
+    label2: string;
+    value2: number;
+  };
 }
 
 const colorClasses = {
@@ -17,7 +24,7 @@ const colorClasses = {
   danger: 'text-destructive',
 };
 
-export function StatCard({ icon, label, value, color, tooltip }: StatCardProps) {
+export function StatCard({ icon, label, value, color, tooltip, breakdown }: StatCardProps) {
   return (
     <div className="stat-card animate-fade-in relative">
       {tooltip && (
@@ -41,6 +48,18 @@ export function StatCard({ icon, label, value, color, tooltip }: StatCardProps) 
       <div className={`text-5xl font-bold font-mono ${colorClasses[color]}`}>
         {value}
       </div>
+      {breakdown && (
+        <div className="mt-3 pt-3 border-t border-border/30 text-sm text-muted-foreground space-y-1">
+          <div className="flex justify-between">
+            <span>{breakdown.label1}:</span>
+            <span className={colorClasses[color]}>{breakdown.value1}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>{breakdown.label2}:</span>
+            <span className={colorClasses[color]}>{breakdown.value2}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
