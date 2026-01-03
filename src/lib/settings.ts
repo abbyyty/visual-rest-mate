@@ -1,11 +1,14 @@
 // User settings storage and retrieval with validation
 import { z } from 'zod';
 import { devError } from './logger';
+import { TimezoneOption, TIMEZONE_OPTIONS } from './timezone';
 
 const SpeedSettingSchema = z.enum(['slow', 'normal', 'fast']);
+const TimezoneOptionSchema = z.enum(['USA', 'UK', 'HongKong', 'China', 'Japan', 'Korea']);
 
 const UserSettingsSchema = z.object({
   breakIntervalMinutes: z.number().min(1).max(120),
+  timezone: TimezoneOptionSchema,
   speeds: z.object({
     vertical: SpeedSettingSchema,
     horizontal: SpeedSettingSchema,
@@ -19,6 +22,7 @@ export type SpeedSetting = z.infer<typeof SpeedSettingSchema>;
 
 export interface UserSettings {
   breakIntervalMinutes: number;
+  timezone: TimezoneOption;
   speeds: {
     vertical: SpeedSetting;
     horizontal: SpeedSetting;
@@ -41,6 +45,7 @@ const STORAGE_KEY = 'userSettings';
 
 export const DEFAULT_SETTINGS: UserSettings = {
   breakIntervalMinutes: 30,
+  timezone: 'HongKong',
   speeds: {
     vertical: 'normal',
     horizontal: 'normal',
@@ -49,6 +54,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
     diagonal2: 'normal',
   },
 };
+
+export function getUserTimezone(): TimezoneOption {
+  return getUserSettings().timezone;
+}
 
 export function getUserSettings(): UserSettings {
   try {

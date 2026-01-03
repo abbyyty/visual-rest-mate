@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { devError, devLog } from '@/lib/logger';
-import { getHongKongDateString, getHongKongTimeInfo } from '@/lib/hongKongTime';
+import { getUserTimezone } from '@/lib/settings';
+import { 
+  getDateStringInTimezone, 
+  getTimezoneInfo, 
+  TIMEZONE_CONFIG,
+  TimezoneOption 
+} from '@/lib/timezone';
 
 export interface DailyTracking {
   id?: string;
@@ -114,14 +120,18 @@ export function useDailyTracking() {
   const trackingRef = useRef<DailyTracking | null>(null);
   const lastDateRef = useRef<string | null>(null);
   
-  // Use Hong Kong timezone for date boundary
-  const today = getHongKongDateString();
+  // Get user's timezone from settings
+  const userTimezone = getUserTimezone();
+  const tzConfig = TIMEZONE_CONFIG[userTimezone];
   
-  // Log HK time info on mount for debugging
+  // Use user's timezone for date boundary
+  const today = getDateStringInTimezone(tzConfig.iana);
+  
+  // Log timezone info on mount for debugging
   useEffect(() => {
-    const hkInfo = getHongKongTimeInfo();
-    devLog(`Hong Kong time: ${hkInfo.date} ${hkInfo.time} (${hkInfo.timezone})`);
-  }, []);
+    const tzInfo = getTimezoneInfo(userTimezone);
+    devLog(`User timezone: ${tzInfo.date} ${tzInfo.time} (${tzInfo.abbr})`);
+  }, [userTimezone]);
 
   const fetchTracking = useCallback(async () => {
     if (!user) {
@@ -329,21 +339,21 @@ export function useDailyTracking() {
   useEffect(() => {
     fetchTracking();
     
-    // Check every minute if we crossed midnight in Hong Kong
+    // Check every minute if we crossed midnight in user's timezone
     const interval = setInterval(() => {
-      const currentHkDate = getHongKongDateString();
-      if (lastDateRef.current && lastDateRef.current !== currentHkDate) {
-        devLog(`HK midnight crossed: ${lastDateRef.current} → ${currentHkDate}`);
+      const currentDate = getDateStringInTimezone(tzConfig.iana);
+      if (lastDateRef.current && lastDateRef.current !== currentDate) {
+        devLog(`Midnight crossed: ${lastDateRef.current} → ${currentDate} (${tzConfig.abbr})`);
         fetchTracking();
       }
-      lastDateRef.current = currentHkDate;
+      lastDateRef.current = currentDate;
     }, 60000); // Check every 60 seconds
     
     // Initialize lastDateRef
-    lastDateRef.current = getHongKongDateString();
+    lastDateRef.current = getDateStringInTimezone(tzConfig.iana);
     
     return () => clearInterval(interval);
-  }, [fetchTracking]);
+  }, [fetchTracking, tzConfig.iana, tzConfig.abbr]);
 
   return {
     tracking,
@@ -359,6 +369,8 @@ export function useDailyTracking() {
     getOveruseTimeSeconds,
     flush,
     refetch: fetchTracking,
+    timezone: userTimezone,
+    timezoneAbbr: tzConfig.abbr,
   };
 }
 
