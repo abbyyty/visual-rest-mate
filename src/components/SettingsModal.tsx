@@ -5,9 +5,42 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS } from '@/lib/settings';
+import { TimezoneOption, TIMEZONE_OPTIONS, TIMEZONE_CONFIG } from '@/lib/timezone';
 
 type SpeedValue = 'slow' | 'normal' | 'fast';
 const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
+
+function TimezoneSelector({ 
+  value, 
+  onChange 
+}: { 
+  value: TimezoneOption; 
+  onChange: (value: TimezoneOption) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm text-foreground">Your Timezone</Label>
+      <div className="flex flex-wrap gap-2">
+        {TIMEZONE_OPTIONS.map((tz) => (
+          <button
+            key={tz}
+            onClick={() => onChange(tz)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors border ${
+              value === tz
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            {TIMEZONE_CONFIG[tz].label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Daily records reset at midnight in your selected timezone
+      </p>
+    </div>
+  );
+}
 
 function SpeedSlider({ 
   label, 
@@ -61,6 +94,8 @@ export function SettingsModal() {
   const handleSave = () => {
     saveUserSettings(settings);
     setOpen(false);
+    // Reload to apply timezone changes
+    window.location.reload();
   };
 
   const updateSpeed = (exercise: keyof UserSettings['speeds'], value: SpeedValue) => {
@@ -86,6 +121,17 @@ export function SettingsModal() {
         </DialogHeader>
         
         <div className="space-y-8 py-4">
+          {/* Timezone Selector */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Timezone
+            </h3>
+            <TimezoneSelector
+              value={settings.timezone}
+              onChange={(tz) => setSettings(prev => ({ ...prev, timezone: tz }))}
+            />
+          </section>
+
           {/* Break Reminder Interval */}
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
