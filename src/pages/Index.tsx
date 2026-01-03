@@ -85,8 +85,7 @@ const Index = () => {
     addOveruseTime,
     getScreenTimeSeconds,
     getOveruseTimeSeconds,
-    flush,
-    timezoneAbbr
+    flush
   } = useDailyTracking();
   
   const [isRunning, setIsRunning] = useState(false);
@@ -643,7 +642,7 @@ const Index = () => {
             <div className="space-y-1">
               <h3 className="text-muted-foreground text-sm">Today's Total Screen Time</h3>
               <div className="text-2xl font-mono text-muted-foreground">
-                {formatTime(todaysTotalLive)} <span className="text-sm text-muted-foreground/70">{timezoneAbbr}</span>
+                {formatTime(todaysTotalLive)}
               </div>
             </div>
             

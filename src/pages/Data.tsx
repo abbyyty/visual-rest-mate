@@ -15,8 +15,6 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { devError } from '@/lib/logger';
-import { getUserTimezone } from '@/lib/settings';
-import { TIMEZONE_CONFIG, getDateStringInTimezone } from '@/lib/timezone';
 
 interface DailyTrackingRow {
   id: string;
@@ -50,28 +48,22 @@ function formatInterval(interval: string | null): string {
   return interval;
 }
 
-function formatDate(dateStr: string, userTimezone: string, tzAbbr: string): string {
-  const today = getDateStringInTimezone(userTimezone);
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   
-  if (dateStr === today) {
-    return `Today (${tzAbbr})`;
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
   }
   
-  // Check if yesterday
-  const yesterday = new Date();
+  const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = getDateStringInTimezone(userTimezone);
-  
-  // Simple date comparison
-  const date = new Date(dateStr + 'T00:00:00');
-  const todayDate = new Date(today + 'T00:00:00');
-  const diff = Math.floor((todayDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diff === 1) {
-    return `Yesterday (${tzAbbr})`;
+  if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
   }
   
-  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${tzAbbr})`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const COLORS = {
@@ -151,12 +143,8 @@ const Data = () => {
 
   if (!user) return null;
 
-  // Get user's timezone settings
-  const userTimezone = getUserTimezone();
-  const tzConfig = TIMEZONE_CONFIG[userTimezone];
-
-  // Get today's data for pie charts using user's timezone
-  const today = getDateStringInTimezone(tzConfig.iana);
+  // Get today's data for pie charts
+  const today = new Date().toISOString().split('T')[0];
   const todayData = data.find(d => d.date === today);
 
   // Screen Time Pie Chart Data
@@ -457,7 +445,7 @@ const Data = () => {
                 <TableBody>
                   {data.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell className="font-medium">{formatDate(row.date, tzConfig.iana, tzConfig.abbr)}</TableCell>
+                      <TableCell className="font-medium">{formatDate(row.date)}</TableCell>
                       <TableCell>{formatInterval(row.daily_screen_time)}</TableCell>
                       <TableCell>{row.daily_sessions_count}</TableCell>
                       <TableCell>{row.daily_sessions_eye_exercise}</TableCell>
