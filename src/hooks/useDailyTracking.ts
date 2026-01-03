@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { devError, devLog } from '@/lib/logger';
+import { getHongKongDateString, getHongKongTimeInfo } from '@/lib/hongKongTime';
 
 export interface DailyTracking {
   id?: string;
@@ -111,8 +112,16 @@ export function useDailyTracking() {
   const [loading, setLoading] = useState(true);
   
   const trackingRef = useRef<DailyTracking | null>(null);
+  const lastDateRef = useRef<string | null>(null);
   
-  const today = new Date().toISOString().split('T')[0];
+  // Use Hong Kong timezone for date boundary
+  const today = getHongKongDateString();
+  
+  // Log HK time info on mount for debugging
+  useEffect(() => {
+    const hkInfo = getHongKongTimeInfo();
+    devLog(`Hong Kong time: ${hkInfo.date} ${hkInfo.time} (${hkInfo.timezone})`);
+  }, []);
 
   const fetchTracking = useCallback(async () => {
     if (!user) {
@@ -319,6 +328,21 @@ export function useDailyTracking() {
 
   useEffect(() => {
     fetchTracking();
+    
+    // Check every minute if we crossed midnight in Hong Kong
+    const interval = setInterval(() => {
+      const currentHkDate = getHongKongDateString();
+      if (lastDateRef.current && lastDateRef.current !== currentHkDate) {
+        devLog(`HK midnight crossed: ${lastDateRef.current} → ${currentHkDate}`);
+        fetchTracking();
+      }
+      lastDateRef.current = currentHkDate;
+    }, 60000); // Check every 60 seconds
+    
+    // Initialize lastDateRef
+    lastDateRef.current = getHongKongDateString();
+    
+    return () => clearInterval(interval);
   }, [fetchTracking]);
 
   return {
