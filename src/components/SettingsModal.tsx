@@ -4,10 +4,13 @@ import { Settings } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS } from '@/lib/settings';
+import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS, SizeSetting } from '@/lib/settings';
 
 type SpeedValue = 'slow' | 'normal' | 'fast';
 const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
+
+type SizeValue = 'small' | 'medium' | 'large';
+const SIZE_OPTIONS: SizeValue[] = ['small', 'medium', 'large'];
 
 function SpeedSlider({ 
   label, 
@@ -107,6 +110,32 @@ export function SettingsModal() {
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>1 min (testing)</span>
                 <span>30 min</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Size Settings */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Size of Ball
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-foreground">Ball size</Label>
+                <span className="text-sm font-mono text-primary capitalize">{settings.ballSize}</span>
+              </div>
+              <Slider
+                value={[SIZE_OPTIONS.indexOf(settings.ballSize)]}
+                onValueChange={(values) => setSettings(prev => ({ ...prev, ballSize: SIZE_OPTIONS[values[0]] as SizeSetting }))}
+                min={0}
+                max={2}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Small</span>
+                <span>Medium</span>
+                <span>Large</span>
               </div>
             </div>
           </section>
