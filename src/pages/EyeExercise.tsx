@@ -301,12 +301,14 @@ const EyeExercise = () => {
 
       {/* Exercise Area */}
       <main className="flex-1 relative">
-        {/* Instruction overlay */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 text-center">
-          <p className="instruction-text text-primary animate-pulse-glow">
-            {getInstructionText()}
-          </p>
-        </div>
+        {/* Instruction overlay - hide during instructions phase */}
+        {currentPhase?.type !== 'instructions' && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 text-center">
+            <p className="instruction-text text-primary animate-pulse-glow">
+              {getInstructionText()}
+            </p>
+          </div>
+        )}
 
         {/* Dot container */}
         {currentPhase?.showDot && (
@@ -338,11 +340,11 @@ const EyeExercise = () => {
           </div>
         )}
 
-        {/* Instructions screen */}
+        {/* Instructions screen - centered green text with pulse effect */}
         {currentPhase?.type === 'instructions' && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center animate-fade-in max-w-md px-8">
-              <p className="text-2xl font-medium text-foreground leading-relaxed">
+            <div className="text-center animate-fade-in max-w-lg px-8">
+              <p className="instruction-text text-primary animate-pulse-glow leading-relaxed">
                 Keep head still and arm's length,<br />only move your eyes
               </p>
             </div>

@@ -4,7 +4,7 @@ import { Settings } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS, SizeSetting } from '@/lib/settings';
+import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS, SizeSetting, SIZE_VALUES } from '@/lib/settings';
 
 type SpeedValue = 'slow' | 'normal' | 'fast';
 const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
@@ -121,7 +121,17 @@ export function SettingsModal() {
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-sm text-foreground">Ball size</Label>
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm text-foreground">Ball size</Label>
+                  {/* Ball preview */}
+                  <div 
+                    className="bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.6)]"
+                    style={{
+                      width: `${SIZE_VALUES[settings.ballSize]}px`,
+                      height: `${SIZE_VALUES[settings.ballSize]}px`,
+                    }}
+                  />
+                </div>
                 <span className="text-sm font-mono text-primary capitalize">{settings.ballSize}</span>
               </div>
               <Slider
