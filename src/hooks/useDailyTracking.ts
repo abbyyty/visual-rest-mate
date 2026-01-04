@@ -269,9 +269,24 @@ export function useDailyTracking() {
         next.daily_sessions_eye_close + 
         next.daily_sessions_skip;
 
+      // Calculate percentages for full completions
+      const percentageFullExercise = next.daily_sessions_eye_exercise > 0
+        ? Math.round(((next.daily_sessions_eye_exercise - next.daily_sessions_eye_exercise_early_end) / next.daily_sessions_eye_exercise) * 10000) / 100
+        : 0;
+      const percentageFullClose = next.daily_sessions_eye_close > 0
+        ? Math.round(((next.daily_sessions_eye_close - next.daily_sessions_eye_close_early_end) / next.daily_sessions_eye_close) * 10000) / 100
+        : 0;
+
+      // Add percentages to the payload for database
+      const nextWithPercentages = {
+        ...next,
+        daily_percentage_full_eye_exercise: percentageFullExercise,
+        daily_percentage_full_eye_close: percentageFullClose,
+      };
+
       trackingRef.current = next;
       setTracking(next);
-      requestTrackingWrite(key, next);
+      requestTrackingWrite(key, nextWithPercentages as DailyTracking);
     },
     [user, username, today, getDefaultTracking]
   );

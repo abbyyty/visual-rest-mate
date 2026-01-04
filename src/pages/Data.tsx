@@ -83,6 +83,7 @@ const Data = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const [data, setData] = useState<DailyTrackingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllDays, setShowAllDays] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -425,7 +426,17 @@ const Data = () => {
 
         {/* Data Table */}
         <section className="stat-card">
-          <h3 className="text-lg font-mono text-foreground mb-6">Recent Activity</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-mono text-foreground">Recent Activity</h3>
+            {data.length > 3 && (
+              <button
+                onClick={() => setShowAllDays(!showAllDays)}
+                className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                {showAllDays ? 'Show less' : `Show ${Math.min(5, data.length)} days`}
+              </button>
+            )}
+          </div>
           
           {data.length > 0 ? (
             <div className="overflow-x-auto">
@@ -443,7 +454,7 @@ const Data = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((row) => (
+                  {data.slice(0, showAllDays ? 5 : 3).map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{formatDate(row.date)}</TableCell>
                       <TableCell>{formatInterval(row.daily_screen_time)}</TableCell>
