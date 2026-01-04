@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { devError } from './logger';
 
 const SpeedSettingSchema = z.enum(['slow', 'normal', 'fast']);
+const SizeSettingSchema = z.enum(['small', 'medium', 'large']);
 
 const UserSettingsSchema = z.object({
   breakIntervalMinutes: z.number().min(1).max(120),
+  ballSize: SizeSettingSchema,
   speeds: z.object({
     vertical: SpeedSettingSchema,
     horizontal: SpeedSettingSchema,
@@ -16,9 +18,11 @@ const UserSettingsSchema = z.object({
 });
 
 export type SpeedSetting = z.infer<typeof SpeedSettingSchema>;
+export type SizeSetting = z.infer<typeof SizeSettingSchema>;
 
 export interface UserSettings {
   breakIntervalMinutes: number;
+  ballSize: SizeSetting;
   speeds: {
     vertical: SpeedSetting;
     horizontal: SpeedSetting;
@@ -27,6 +31,13 @@ export interface UserSettings {
     diagonal2: SpeedSetting;
   };
 }
+
+// Ball size values in pixels
+export const SIZE_VALUES = {
+  small: 16,
+  medium: 20,
+  large: 28,
+};
 
 // Speed values in seconds per pass/cycle
 export const SPEED_VALUES = {
@@ -41,6 +52,7 @@ const STORAGE_KEY = 'userSettings';
 
 export const DEFAULT_SETTINGS: UserSettings = {
   breakIntervalMinutes: 30,
+  ballSize: 'medium',
   speeds: {
     vertical: 'normal',
     horizontal: 'normal',
@@ -90,4 +102,8 @@ export function getBreakInterval(): number {
 
 export function getSpeedValue(exercise: keyof typeof SPEED_VALUES, setting: SpeedSetting): number {
   return SPEED_VALUES[exercise][setting];
+}
+
+export function getBallSize(): number {
+  return SIZE_VALUES[getUserSettings().ballSize];
 }

@@ -5,11 +5,12 @@ import { toast } from 'sonner';
 import { ExerciseDot } from '@/components/ExerciseDot';
 import { formatMinutesSeconds } from '@/lib/userId';
 import { playStartSound, playOpenEyesSound, playEndSound } from '@/lib/sound';
-import { getUserSettings, getSpeedValue } from '@/lib/settings';
+import { getUserSettings, getSpeedValue, getBallSize } from '@/lib/settings';
 import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { Button } from '@/components/ui/button';
 
 type ExercisePhase = 
+  | 'instructions'
   | 'countdown'
   | 'close_eyes'
   | 'vertical'
@@ -52,6 +53,7 @@ const buildExerciseSequence = (): PhaseConfig[] => {
   ];
 
   return [
+    { type: 'instructions', duration: 3, instruction: 'Keep head still and arm\'s length, only move your eyes', showDot: false },
     { type: 'countdown', duration: 5, instruction: 'Exercise starts in', showDot: false },
     ...cycle, // First cycle
     ...cycle, // Second cycle
@@ -71,12 +73,14 @@ const EyeExercise = () => {
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const settingsRef = useRef(getUserSettings());
+  const ballSizeRef = useRef(getBallSize());
 
   // Build sequence on mount
   useEffect(() => {
     const sequence = buildExerciseSequence();
     setExerciseSequence(sequence);
     settingsRef.current = getUserSettings();
+    ballSizeRef.current = getBallSize();
   }, []);
 
   const currentPhase = exerciseSequence[currentPhaseIndex];
@@ -273,7 +277,7 @@ const EyeExercise = () => {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-mono text-foreground">Eye Exercise</h1>
-            <p className="text-sm text-muted-foreground">Keep head still, move only eyes</p>
+            <p className="text-sm text-muted-foreground">Keep head still and arm's length, only move your eyes</p>
           </div>
           
           <div className="flex items-center gap-8">
@@ -307,7 +311,7 @@ const EyeExercise = () => {
         {/* Dot container */}
         {currentPhase?.showDot && (
           <div className="absolute inset-0 m-8">
-            <ExerciseDot x={dotPosition.x} y={dotPosition.y} />
+            <ExerciseDot x={dotPosition.x} y={dotPosition.y} size={ballSizeRef.current} />
           </div>
         )}
 
@@ -329,6 +333,17 @@ const EyeExercise = () => {
             <div className="text-center animate-fade-in">
               <p className="countdown-text text-accent">
                 {Math.ceil(timeRemaining)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Instructions screen */}
+        {currentPhase?.type === 'instructions' && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center animate-fade-in max-w-md px-8">
+              <p className="text-2xl font-medium text-foreground leading-relaxed">
+                Keep head still and arm's length,<br />only move your eyes
               </p>
             </div>
           </div>
