@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, Moon, SkipForward, Play, Activity, AlertCircle, Flame, Pause, RotateCcw, BarChart3, LogOut } from 'lucide-react';
-import { getTodayDate, formatTime } from '@/lib/userId';
+import { getTodayDate, formatTime, formatMinutesSeconds } from '@/lib/userId';
 import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { StatCard } from '@/components/StatCard';
 import { BreakPopup } from '@/components/BreakPopup';
@@ -14,7 +14,7 @@ import { devLog, devWarn, devError } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
 
 type TimerSnapshot = {
-  currentSessionTime: number;
+  accumulatedSeconds: number;
   sessionOveruseSeconds: number;
   lastDingTime: number;
   wasRunning: boolean;
@@ -39,7 +39,7 @@ function loadTimerSnapshot(): TimerSnapshot | null {
     const parsed = JSON.parse(raw) as Partial<TimerSnapshot>;
 
     if (
-      typeof parsed.currentSessionTime !== 'number' ||
+      typeof parsed.accumulatedSeconds !== 'number' ||
       typeof parsed.sessionOveruseSeconds !== 'number' ||
       typeof parsed.lastDingTime !== 'number' ||
       typeof parsed.wasRunning !== 'boolean' ||
@@ -49,7 +49,7 @@ function loadTimerSnapshot(): TimerSnapshot | null {
     }
 
     return {
-      currentSessionTime: parsed.currentSessionTime,
+      accumulatedSeconds: parsed.accumulatedSeconds,
       sessionOveruseSeconds: parsed.sessionOveruseSeconds,
       lastDingTime: parsed.lastDingTime,
       wasRunning: parsed.wasRunning,
@@ -66,6 +66,29 @@ function clearTimerSnapshot() {
     sessionStorage.removeItem(TIMER_SNAPSHOT_KEY);
   } catch {
     // ignore
+  }
+}
+
+// Request notification permission
+async function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+// Show a browser notification for break reminders
+function showBreakNotification() {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('🧘 Time for a Break!', {
+        body: "You've been working. Take a break to rest your eyes.",
+        icon: '/favicon.ico',
+        tag: 'break-reminder',
+        requireInteraction: true,
+      });
+    } catch {
+      // Notification constructor may fail in some contexts
+    }
   }
 }
 
@@ -93,14 +116,106 @@ const Index = () => {
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
   const [showBreakPopup, setShowBreakPopup] = useState(false);
   const [showBlackScreen, setShowBlackScreen] = useState(false);
-  const [sessionOveruseSeconds, setSessionOveruseSeconds] = useState(0); // Overuse since last reminder (for popup)
+  const [sessionOveruseSeconds, setSessionOveruseSeconds] = useState(0);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
-  const lastDingTimeRef = useRef(0); // When last ding occurred
+  const lastDingTimeRef = useRef(0);
+
+  // Timestamp-based timing refs
+  const sessionStartedAtRef = useRef<number>(0); // Date.now() when current running segment began
+  const pausedElapsedRef = useRef<number>(0); // accumulated seconds before current running segment
+
+  // Notification timeout ref for background break alerts
+  const notifTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-start from exercise or relax navigation
   const autoStartTriggeredRef = useRef(false);
+
+  // Get real elapsed seconds based on timestamps
+  const getRealElapsed = useCallback(() => {
+    if (!sessionStartedAtRef.current) return pausedElapsedRef.current;
+    return pausedElapsedRef.current + Math.floor((Date.now() - sessionStartedAtRef.current) / 1000);
+  }, []);
+
+  // Check for break intervals and trigger popup/notification/sound
+  const checkBreakIntervals = useCallback((realElapsed: number) => {
+    const breakIntervalSeconds = getBreakInterval() * 60;
+    if (realElapsed <= 0 || realElapsed < breakIntervalSeconds) return;
+
+    const intervalsPassed = Math.floor(realElapsed / breakIntervalSeconds);
+    const lastDingInterval = lastDingTimeRef.current > 0
+      ? Math.floor(lastDingTimeRef.current / breakIntervalSeconds)
+      : 0;
+
+    if (intervalsPassed > lastDingInterval) {
+      devLog(`🔔 Break reminder triggered at ${formatMinutesSeconds(realElapsed)}`);
+      playDingDing();
+      showBreakNotification();
+
+      const newDingTime = intervalsPassed * breakIntervalSeconds;
+      const timeSinceLastDing = lastDingTimeRef.current > 0
+        ? newDingTime - lastDingTimeRef.current
+        : 0;
+
+      if (timeSinceLastDing > 0 && lastDingTimeRef.current > 0) {
+        devLog(`🔥 Adding overuse from ignored reminder: ${formatMinutesSeconds(timeSinceLastDing)}`);
+        setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
+      }
+
+      lastDingTimeRef.current = newDingTime;
+      setShowBreakPopup(true);
+    }
+  }, []);
+
+  // Schedule a background notification timeout for the next break
+  const scheduleBreakNotification = useCallback(() => {
+    if (notifTimeoutRef.current) {
+      clearTimeout(notifTimeoutRef.current);
+      notifTimeoutRef.current = null;
+    }
+
+    const breakIntervalSeconds = getBreakInterval() * 60;
+    const elapsed = getRealElapsed();
+    const nextBreakAt = (Math.floor(elapsed / breakIntervalSeconds) + 1) * breakIntervalSeconds;
+    const delayMs = (nextBreakAt - elapsed) * 1000;
+
+    if (delayMs > 0) {
+      notifTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current && sessionStartedAtRef.current) {
+          const realElapsed = getRealElapsed();
+          setCurrentSessionTime(realElapsed);
+          checkBreakIntervals(realElapsed);
+          // Schedule the next one
+          scheduleBreakNotification();
+        }
+      }, delayMs);
+    }
+  }, [getRealElapsed, checkBreakIntervals]);
+
+  // Start the timer tick interval (timestamp-based)
+  const startTimerTick = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    timerRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        return;
+      }
+
+      const realElapsed = getRealElapsed();
+      setCurrentSessionTime(realElapsed);
+
+      if (realElapsed % 10 === 0 && realElapsed > 0) {
+        devLog(`⏱️ Timer: ${formatMinutesSeconds(realElapsed)}`);
+      }
+
+      checkBreakIntervals(realElapsed);
+    }, 1000);
+  }, [getRealElapsed, checkBreakIntervals]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -113,6 +228,10 @@ const Index = () => {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      if (notifTimeoutRef.current) {
+        clearTimeout(notifTimeoutRef.current);
+        notifTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -123,11 +242,33 @@ const Index = () => {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (!isRunning && notifTimeoutRef.current) {
+      clearTimeout(notifTimeoutRef.current);
+      notifTimeoutRef.current = null;
+    }
   }, [isRunning]);
+
+  // Handle tab visibility change - catch up on missed time
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isRunning && sessionStartedAtRef.current) {
+        const realElapsed = getRealElapsed();
+        devLog(`👁️ Tab visible again, real elapsed: ${formatMinutesSeconds(realElapsed)}`);
+        setCurrentSessionTime(realElapsed);
+        checkBreakIntervals(realElapsed);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isRunning, getRealElapsed, checkBreakIntervals]);
 
   const handleStart = useCallback(() => {
     try {
       devLog('🚀 START clicked!');
+
+      // Request notification permission
+      requestNotificationPermission();
 
       // If paused, resume from current time
       if (isPaused) {
@@ -135,44 +276,12 @@ const Index = () => {
         setIsPaused(false);
         setIsRunning(true);
         
-        const breakIntervalSeconds = getBreakInterval() * 60;
+        // Set the start timestamp for this new running segment
+        sessionStartedAtRef.current = Date.now();
+        // pausedElapsedRef already has the accumulated time
         
-        timerRef.current = setInterval(() => {
-          if (!isMountedRef.current) {
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            return;
-          }
-          
-          setCurrentSessionTime(prev => {
-            const newTime = prev + 1;
-
-            if (newTime % 10 === 0) {
-              devLog(`⏱️ Timer: ${formatTime(newTime)}`);
-            }
-
-            if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
-              devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
-              playDingDing();
-              
-              const timeSinceLastDing = lastDingTimeRef.current > 0 
-                ? newTime - lastDingTimeRef.current 
-                : 0;
-              
-              if (timeSinceLastDing > 0) {
-                devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
-                setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
-              }
-              
-              lastDingTimeRef.current = newTime;
-              setShowBreakPopup(true);
-            }
-            
-            return newTime;
-          });
-        }, 1000);
+        startTimerTick();
+        scheduleBreakNotification();
         
         toast.success('Timer resumed');
         return;
@@ -191,71 +300,35 @@ const Index = () => {
         timerRef.current = null;
       }
 
-      // Reset timer to 00:00:00
-      devLog('🔄 Resetting timer to 00:00:00');
+      // Reset timer to 00:00
+      devLog('🔄 Resetting timer to 00:00');
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
+      pausedElapsedRef.current = 0;
+      sessionStartedAtRef.current = Date.now();
       setIsRunning(true);
       setIsPaused(false);
       
       const breakIntervalSeconds = getBreakInterval() * 60;
       devLog(`⏱️ Starting timer with break interval: ${breakIntervalSeconds} seconds`);
 
-      // Start the timer
-      timerRef.current = setInterval(() => {
-        if (!isMountedRef.current) {
-          devWarn('⚠️ Component unmounted, stopping timer');
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          return;
-        }
-        
-        setCurrentSessionTime(prev => {
-          const newTime = prev + 1;
-
-          // Debug log every 10 seconds
-          if (newTime % 10 === 0) {
-            devLog(`⏱️ Timer: ${formatTime(newTime)}`);
-          }
-
-          // Check for break interval (ding ding every interval)
-          if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
-            devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
-            playDingDing();
-            
-            // Calculate overuse since last popup (or since start if first popup)
-            const timeSinceLastDing = lastDingTimeRef.current > 0 
-              ? newTime - lastDingTimeRef.current 
-              : 0;
-            
-            // If user ignored previous reminder, that time is overuse
-            if (timeSinceLastDing > 0) {
-              devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
-              setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
-            }
-            
-            lastDingTimeRef.current = newTime;
-            setShowBreakPopup(true);
-          }
-          
-          return newTime;
-        });
-      }, 1000);
+      startTimerTick();
+      scheduleBreakNotification();
       
       devLog('✅ Timer started successfully');
     } catch (error) {
       devError('❌ Error in handleStart:', error);
       setIsRunning(false);
       setIsPaused(false);
+      sessionStartedAtRef.current = 0;
+      pausedElapsedRef.current = 0;
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     }
-  }, [isRunning, isPaused]);
+  }, [isRunning, isPaused, startTimerTick, scheduleBreakNotification]);
 
   // Handle auto-start from exercise/relax navigation
   useEffect(() => {
@@ -298,68 +371,50 @@ const Index = () => {
     setShowBreakPopup(false);
     setShowBlackScreen(false);
 
-    setCurrentSessionTime(snapshot.currentSessionTime);
+    // Calculate time that passed while on data page
+    const elapsedWhileAway = snapshot.wasRunning
+      ? Math.floor((Date.now() - snapshot.savedAt) / 1000)
+      : 0;
+    const totalAccumulated = snapshot.accumulatedSeconds + elapsedWhileAway;
+
+    setCurrentSessionTime(totalAccumulated);
     setSessionOveruseSeconds(snapshot.sessionOveruseSeconds);
     lastDingTimeRef.current = snapshot.lastDingTime;
 
     if (!snapshot.wasRunning) {
+      pausedElapsedRef.current = snapshot.accumulatedSeconds;
+      sessionStartedAtRef.current = 0;
       setIsRunning(false);
       setIsPaused(snapshot.wasPaused);
       return;
     }
 
-    // Resume ticking exactly where we left off
-    const breakIntervalSeconds = getBreakInterval() * 60;
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    // Resume ticking - set refs for timestamp-based timing
+    pausedElapsedRef.current = totalAccumulated;
+    sessionStartedAtRef.current = Date.now();
 
     setIsPaused(false);
     setIsRunning(true);
 
-    timerRef.current = setInterval(() => {
-      if (!isMountedRef.current) {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        return;
-      }
+    startTimerTick();
+    scheduleBreakNotification();
 
-      setCurrentSessionTime((prev) => {
-        const newTime = prev + 1;
-
-        if (newTime % 10 === 0) {
-          devLog(`⏱️ Timer: ${formatTime(newTime)}`);
-        }
-
-        if (newTime > 0 && newTime % breakIntervalSeconds === 0) {
-          devLog(`🔔 Break reminder triggered at ${formatTime(newTime)}`);
-          playDingDing();
-
-          const timeSinceLastDing = lastDingTimeRef.current > 0 ? newTime - lastDingTimeRef.current : 0;
-
-          if (timeSinceLastDing > 0) {
-            devLog(`🔥 Adding overuse from ignored reminder: ${formatTime(timeSinceLastDing)}`);
-            setSessionOveruseSeconds((prevOveruse) => prevOveruse + timeSinceLastDing);
-          }
-
-          lastDingTimeRef.current = newTime;
-          setShowBreakPopup(true);
-        }
-
-        return newTime;
-      });
-    }, 1000);
-  }, [location.state, navigate]);
+    // Check if any break intervals were missed while away
+    checkBreakIntervals(totalAccumulated);
+  }, [location.state, navigate, startTimerTick, scheduleBreakNotification, checkBreakIntervals]);
 
   const handlePause = useCallback(() => {
     try {
       devLog('⏸️ PAUSE clicked!');
+      
+      // Capture real elapsed before stopping
+      const realElapsed = getRealElapsed();
+      pausedElapsedRef.current = realElapsed;
+      sessionStartedAtRef.current = 0;
+      
       setIsRunning(false);
       setIsPaused(true);
+      setCurrentSessionTime(realElapsed);
 
       // Clear the timer but keep the time
       if (timerRef.current) {
@@ -368,16 +423,19 @@ const Index = () => {
         timerRef.current = null;
       }
 
-      devLog(`✅ Timer paused at ${formatTime(currentSessionTime)}`);
+      devLog(`✅ Timer paused at ${formatMinutesSeconds(realElapsed)}`);
       toast.info('Timer paused');
     } catch (error) {
       devError('❌ Error in handlePause:', error);
     }
-  }, [currentSessionTime]);
+  }, [getRealElapsed]);
 
   const handleReset = useCallback(() => {
     try {
       devLog('🔄 RESET clicked!');
+      
+      const realElapsed = getRealElapsed();
+      
       setIsRunning(false);
       setIsPaused(false);
 
@@ -389,21 +447,23 @@ const Index = () => {
       }
 
       // Save current session time before reset
-      if (currentSessionTime > 0) {
-        devLog(`💾 Saving session time before reset: ${formatTime(currentSessionTime)}`);
-        addScreenTime(currentSessionTime);
+      if (realElapsed > 0) {
+        devLog(`💾 Saving session time before reset: ${formatMinutesSeconds(realElapsed)}`);
+        addScreenTime(realElapsed);
       }
       
       // Save accumulated session overuse to cumulative
       if (sessionOveruseSeconds > 0) {
-        devLog(`💾 Saving overuse time: ${formatTime(sessionOveruseSeconds)}`);
+        devLog(`💾 Saving overuse time: ${formatMinutesSeconds(sessionOveruseSeconds)}`);
         addOveruseTime(sessionOveruseSeconds);
       }
       
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
       lastDingTimeRef.current = 0;
-      devLog('✅ Timer reset to 00:00:00');
+      pausedElapsedRef.current = 0;
+      sessionStartedAtRef.current = 0;
+      devLog('✅ Timer reset to 00:00');
       toast.success('Timer reset');
     } catch (error) {
       devError('❌ Error in handleReset:', error);
@@ -415,25 +475,29 @@ const Index = () => {
       }
       setCurrentSessionTime(0);
       setSessionOveruseSeconds(0);
+      pausedElapsedRef.current = 0;
+      sessionStartedAtRef.current = 0;
     }
-  }, [addScreenTime, addOveruseTime, sessionOveruseSeconds, currentSessionTime]);
+  }, [getRealElapsed, addScreenTime, addOveruseTime, sessionOveruseSeconds]);
 
   // Calculate session overuse when user clicks (time since last ding)
   const calculateSessionOveruse = useCallback(() => {
-    const timeSinceLastDing = currentSessionTime - lastDingTimeRef.current;
+    const realElapsed = getRealElapsed();
+    const timeSinceLastDing = realElapsed - lastDingTimeRef.current;
     
     // Add time since last ding as session overuse
     if (timeSinceLastDing > 0 && lastDingTimeRef.current > 0) {
-      devLog(`🔥 Adding late response overuse: ${formatTime(timeSinceLastDing)}`);
+      devLog(`🔥 Adding late response overuse: ${formatMinutesSeconds(timeSinceLastDing)}`);
       setSessionOveruseSeconds(prev => prev + timeSinceLastDing);
       return timeSinceLastDing;
     }
     return 0;
-  }, [currentSessionTime]);
+  }, [getRealElapsed]);
 
   const handleEyeExercise = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    const realElapsed = getRealElapsed();
     
     setShowBreakPopup(false);
     incrementEyeExercise();
@@ -446,8 +510,8 @@ const Index = () => {
     setIsRunning(false);
     
     // Save current session time before navigating
-    if (currentSessionTime > 0) {
-      addScreenTime(currentSessionTime);
+    if (realElapsed > 0) {
+      addScreenTime(realElapsed);
     }
     // Save session overuse to cumulative
     if (totalSessionOveruse > 0) {
@@ -457,13 +521,16 @@ const Index = () => {
     setCurrentSessionTime(0);
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
+    pausedElapsedRef.current = 0;
+    sessionStartedAtRef.current = 0;
     
     navigate('/eye-exercise');
-  }, [incrementEyeExercise, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeExercise, navigate, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleCloseEyes = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    const realElapsed = getRealElapsed();
     
     setShowBreakPopup(false);
     incrementEyeClose();
@@ -476,8 +543,8 @@ const Index = () => {
     setIsRunning(false);
     
     // Save current session time
-    if (currentSessionTime > 0) {
-      addScreenTime(currentSessionTime);
+    if (realElapsed > 0) {
+      addScreenTime(realElapsed);
     }
     // Save session overuse to cumulative
     if (totalSessionOveruse > 0) {
@@ -487,17 +554,20 @@ const Index = () => {
     setCurrentSessionTime(0);
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
+    pausedElapsedRef.current = 0;
+    sessionStartedAtRef.current = 0;
     
     setShowBlackScreen(true);
-  }, [incrementEyeClose, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeClose, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   const handleSkip = useCallback(() => {
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    const realElapsed = getRealElapsed();
 
     // Persist this session immediately (no RESET required)
-    if (currentSessionTime > 0) {
-      addScreenTime(currentSessionTime);
+    if (realElapsed > 0) {
+      addScreenTime(realElapsed);
     }
     if (totalSessionOveruse > 0) {
       addOveruseTime(totalSessionOveruse);
@@ -510,15 +580,20 @@ const Index = () => {
     setCurrentSessionTime(0);
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
+    pausedElapsedRef.current = 0;
+    sessionStartedAtRef.current = Date.now();
+
+    // Restart the tick
+    startTimerTick();
+    scheduleBreakNotification();
 
     devLog('⏭️ Skip clicked - restarting timer from 0');
-  }, [incrementSkip, calculateSessionOveruse, sessionOveruseSeconds, addOveruseTime, currentSessionTime, addScreenTime]);
+  }, [incrementSkip, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addOveruseTime, addScreenTime, startTimerTick, scheduleBreakNotification]);
 
   const handleDirectExercise = useCallback(() => {
-    // Treat direct exercise like a break choice: persist current session, reset,
-    // then start the exercise. The timer will auto-resume on return.
     const lateOveruse = calculateSessionOveruse();
     const totalSessionOveruse = sessionOveruseSeconds + lateOveruse;
+    const realElapsed = getRealElapsed();
 
     incrementEyeExercise();
 
@@ -531,8 +606,8 @@ const Index = () => {
     setIsPaused(false);
 
     // Persist session
-    if (currentSessionTime > 0) {
-      addScreenTime(currentSessionTime);
+    if (realElapsed > 0) {
+      addScreenTime(realElapsed);
     }
     if (totalSessionOveruse > 0) {
       addOveruseTime(totalSessionOveruse);
@@ -541,9 +616,11 @@ const Index = () => {
     setCurrentSessionTime(0);
     setSessionOveruseSeconds(0);
     lastDingTimeRef.current = 0;
+    pausedElapsedRef.current = 0;
+    sessionStartedAtRef.current = 0;
 
     navigate('/eye-exercise');
-  }, [incrementEyeExercise, navigate, calculateSessionOveruse, currentSessionTime, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
+  }, [incrementEyeExercise, navigate, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
   // Today's total base from database (accumulated sessions)
   const todaysTotalBase = getScreenTimeSeconds();
@@ -564,8 +641,10 @@ const Index = () => {
       : 0);
 
   const handleViewData = useCallback(() => {
+    const realElapsed = getRealElapsed();
+    
     saveTimerSnapshot({
-      currentSessionTime,
+      accumulatedSeconds: realElapsed,
       sessionOveruseSeconds,
       lastDingTime: lastDingTimeRef.current,
       wasRunning: isRunning,
@@ -582,10 +661,12 @@ const Index = () => {
     setShowBreakPopup(false);
 
     if (isRunning) {
+      pausedElapsedRef.current = realElapsed;
+      sessionStartedAtRef.current = 0;
       setIsRunning(false);
       setIsPaused(true);
     }
-  }, [currentSessionTime, sessionOveruseSeconds, isRunning, isPaused]);
+  }, [getRealElapsed, sessionOveruseSeconds, isRunning, isPaused]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -630,11 +711,11 @@ const Index = () => {
           
           {/* Timer Section */}
           <section className="text-center space-y-6 animate-fade-in">
-            {/* Current Session Timer (Big, Bold) */}
+            {/* Current Session Timer (Big, Bold) - MM:SS format */}
             <div className="space-y-2">
               <h2 className="text-muted-foreground text-lg">Current Session</h2>
               <div className="timer-display text-primary">
-                {formatTime(currentSessionTime)}
+                {formatMinutesSeconds(currentSessionTime)}
               </div>
             </div>
 
@@ -716,7 +797,7 @@ const Index = () => {
             
             {isPaused && (
               <p className="text-warning animate-pulse">
-                ⏸️ Timer paused at {formatTime(currentSessionTime)}
+                ⏸️ Timer paused at {formatMinutesSeconds(currentSessionTime)}
               </p>
             )}
           </section>
