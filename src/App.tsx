@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import EyeExercise from "./pages/EyeExercise";
 import Auth from "./pages/Auth";
+import Consent from "./pages/Consent";
 import Data from "./pages/Data";
 import NotFound from "./pages/NotFound";
 
@@ -22,6 +23,11 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/consent" element={
+              <ProtectedRoute>
+                <Consent />
+              </ProtectedRoute>
+            } />
             <Route path="/" element={
               <ProtectedRoute>
                 <Index />
