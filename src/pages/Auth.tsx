@@ -80,8 +80,8 @@ const Auth = () => {
             toast.error(error.message);
           }
         } else {
-          toast.success('Account created! Welcome!');
-          navigate('/');
+          toast.success('Account created!');
+          navigate('/consent');
         }
       }
     } finally {
