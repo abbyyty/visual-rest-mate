@@ -24,12 +24,11 @@ type TimerSnapshot = {
 
 const TIMER_SNAPSHOT_KEY = 'timer_snapshot_v1';
 
+// Navigation snapshot (sessionStorage - for /data page round-trips)
 function saveTimerSnapshot(snapshot: TimerSnapshot) {
   try {
     sessionStorage.setItem(TIMER_SNAPSHOT_KEY, JSON.stringify(snapshot));
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
 }
 
 function loadTimerSnapshot(): TimerSnapshot | null {
@@ -37,17 +36,13 @@ function loadTimerSnapshot(): TimerSnapshot | null {
     const raw = sessionStorage.getItem(TIMER_SNAPSHOT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<TimerSnapshot>;
-
     if (
       typeof parsed.accumulatedSeconds !== 'number' ||
       typeof parsed.sessionOveruseSeconds !== 'number' ||
       typeof parsed.lastDingTime !== 'number' ||
       typeof parsed.wasRunning !== 'boolean' ||
       typeof parsed.wasPaused !== 'boolean'
-    ) {
-      return null;
-    }
-
+    ) return null;
     return {
       accumulatedSeconds: parsed.accumulatedSeconds,
       sessionOveruseSeconds: parsed.sessionOveruseSeconds,
@@ -56,17 +51,47 @@ function loadTimerSnapshot(): TimerSnapshot | null {
       wasPaused: parsed.wasPaused,
       savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now(),
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function clearTimerSnapshot() {
+  try { sessionStorage.removeItem(TIMER_SNAPSHOT_KEY); } catch { /* ignore */ }
+}
+
+// Persistent timer state (localStorage - survives tab drag-out / reload)
+const PERSISTENT_TIMER_KEY = 'persistent_timer_v1';
+
+type PersistentTimerState = {
+  /** Date.now() when current running segment started (0 if paused/stopped) */
+  sessionStartedAt: number;
+  /** Accumulated seconds before current running segment */
+  pausedElapsed: number;
+  sessionOveruseSeconds: number;
+  lastDingTime: number;
+  isRunning: boolean;
+  isPaused: boolean;
+  savedAt: number;
+};
+
+function savePersistentTimer(state: PersistentTimerState) {
+  try { localStorage.setItem(PERSISTENT_TIMER_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+}
+
+function loadPersistentTimer(): PersistentTimerState | null {
   try {
-    sessionStorage.removeItem(TIMER_SNAPSHOT_KEY);
-  } catch {
-    // ignore
-  }
+    const raw = localStorage.getItem(PERSISTENT_TIMER_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<PersistentTimerState>;
+    if (typeof p.sessionStartedAt !== 'number' || typeof p.pausedElapsed !== 'number' ||
+        typeof p.isRunning !== 'boolean' || typeof p.isPaused !== 'boolean') return null;
+    // Discard if older than 24 hours
+    if (typeof p.savedAt === 'number' && Date.now() - p.savedAt > 24 * 60 * 60 * 1000) return null;
+    return p as PersistentTimerState;
+  } catch { return null; }
+}
+
+function clearPersistentTimer() {
+  try { localStorage.removeItem(PERSISTENT_TIMER_KEY); } catch { /* ignore */ }
 }
 
 // Request notification permission
@@ -217,10 +242,67 @@ const Index = () => {
     }, 1000);
   }, [getRealElapsed, checkBreakIntervals]);
   
+  // Helper: persist current timer state to localStorage
+  const persistTimerState = useCallback(() => {
+    savePersistentTimer({
+      sessionStartedAt: sessionStartedAtRef.current,
+      pausedElapsed: pausedElapsedRef.current,
+      sessionOveruseSeconds,
+      lastDingTime: lastDingTimeRef.current,
+      isRunning,
+      isPaused,
+      savedAt: Date.now(),
+    });
+  }, [sessionOveruseSeconds, isRunning, isPaused]);
+
   // Cleanup on unmount
   useEffect(() => {
     devLog('🔧 Index component mounted');
     isMountedRef.current = true;
+
+    // --- Restore persistent timer state on mount (survives reload / drag-out) ---
+    // Only restore if there's no navigation state (fromData, fromExercise, etc.)
+    const navState = location.state as Record<string, unknown> | null;
+    const hasNavState = navState && (navState.fromData || navState.fromExercise || navState.fromRelax);
+
+    if (!hasNavState) {
+      const persisted = loadPersistentTimer();
+      if (persisted && (persisted.isRunning || persisted.isPaused)) {
+        devLog('🔄 Restoring persistent timer state from localStorage');
+
+        lastDingTimeRef.current = persisted.lastDingTime ?? 0;
+
+        if (persisted.isRunning && persisted.sessionStartedAt > 0) {
+          // Timer was running — calculate elapsed since save
+          const elapsedSinceSave = Math.floor((Date.now() - persisted.sessionStartedAt) / 1000);
+          const totalAccumulated = persisted.pausedElapsed + elapsedSinceSave;
+
+          pausedElapsedRef.current = totalAccumulated;
+          sessionStartedAtRef.current = Date.now();
+
+          setCurrentSessionTime(totalAccumulated);
+          setSessionOveruseSeconds(persisted.sessionOveruseSeconds ?? 0);
+          setIsRunning(true);
+          setIsPaused(false);
+
+          // Start ticking & schedule notifications
+          startTimerTick();
+          scheduleBreakNotification();
+
+          // Check if break intervals were missed while reloading
+          checkBreakIntervals(totalAccumulated);
+        } else if (persisted.isPaused) {
+          pausedElapsedRef.current = persisted.pausedElapsed;
+          sessionStartedAtRef.current = 0;
+
+          setCurrentSessionTime(persisted.pausedElapsed);
+          setSessionOveruseSeconds(persisted.sessionOveruseSeconds ?? 0);
+          setIsRunning(false);
+          setIsPaused(true);
+        }
+      }
+    }
+
     return () => {
       devLog('🔧 Index component unmounting, cleaning up timer');
       isMountedRef.current = false;
@@ -233,7 +315,32 @@ const Index = () => {
         notifTimeoutRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Save persistent state on beforeunload (tab close, reload, drag-out)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      savePersistentTimer({
+        sessionStartedAt: sessionStartedAtRef.current,
+        pausedElapsed: pausedElapsedRef.current,
+        sessionOveruseSeconds,
+        lastDingTime: lastDingTimeRef.current,
+        isRunning,
+        isPaused,
+        savedAt: Date.now(),
+      });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sessionOveruseSeconds, isRunning, isPaused]);
+
+  // Periodically persist timer state every 5 seconds while running
+  useEffect(() => {
+    if (!isRunning) return;
+    const id = setInterval(() => persistTimerState(), 5000);
+    return () => clearInterval(id);
+  }, [isRunning, persistTimerState]);
 
   // Cleanup timer when isRunning becomes false
   useEffect(() => {
@@ -256,12 +363,26 @@ const Index = () => {
         devLog(`👁️ Tab visible again, real elapsed: ${formatMinutesSeconds(realElapsed)}`);
         setCurrentSessionTime(realElapsed);
         checkBreakIntervals(realElapsed);
+        // Re-schedule notification for next interval
+        scheduleBreakNotification();
+      }
+      // Save state when going hidden (in case tab gets killed)
+      if (document.visibilityState === 'hidden' && (isRunning || isPaused)) {
+        savePersistentTimer({
+          sessionStartedAt: sessionStartedAtRef.current,
+          pausedElapsed: pausedElapsedRef.current,
+          sessionOveruseSeconds,
+          lastDingTime: lastDingTimeRef.current,
+          isRunning,
+          isPaused,
+          savedAt: Date.now(),
+        });
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isRunning, getRealElapsed, checkBreakIntervals]);
+  }, [isRunning, isPaused, sessionOveruseSeconds, getRealElapsed, checkBreakIntervals, scheduleBreakNotification]);
 
   const handleStart = useCallback(() => {
     try {
@@ -423,6 +544,17 @@ const Index = () => {
         timerRef.current = null;
       }
 
+      // Persist paused state so it survives reload
+      savePersistentTimer({
+        sessionStartedAt: 0,
+        pausedElapsed: realElapsed,
+        sessionOveruseSeconds,
+        lastDingTime: lastDingTimeRef.current,
+        isRunning: false,
+        isPaused: true,
+        savedAt: Date.now(),
+      });
+
       devLog(`✅ Timer paused at ${formatMinutesSeconds(realElapsed)}`);
       toast.info('Timer paused');
     } catch (error) {
@@ -463,6 +595,7 @@ const Index = () => {
       lastDingTimeRef.current = 0;
       pausedElapsedRef.current = 0;
       sessionStartedAtRef.current = 0;
+      clearPersistentTimer();
       devLog('✅ Timer reset to 00:00');
       toast.success('Timer reset');
     } catch (error) {
@@ -524,6 +657,7 @@ const Index = () => {
     pausedElapsedRef.current = 0;
     sessionStartedAtRef.current = 0;
     
+    clearPersistentTimer();
     navigate('/eye-exercise');
   }, [incrementEyeExercise, navigate, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
@@ -557,6 +691,7 @@ const Index = () => {
     pausedElapsedRef.current = 0;
     sessionStartedAtRef.current = 0;
     
+    clearPersistentTimer();
     setShowBlackScreen(true);
   }, [incrementEyeClose, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
@@ -619,6 +754,7 @@ const Index = () => {
     pausedElapsedRef.current = 0;
     sessionStartedAtRef.current = 0;
 
+    clearPersistentTimer();
     navigate('/eye-exercise');
   }, [incrementEyeExercise, navigate, calculateSessionOveruse, getRealElapsed, sessionOveruseSeconds, addScreenTime, addOveruseTime]);
 
