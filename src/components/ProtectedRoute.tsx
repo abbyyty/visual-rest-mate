@@ -19,6 +19,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
+    setConsentChecked(false);
     supabase
       .from('consent_records')
       .select('id')
@@ -28,7 +29,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         setHasConsent(!!data);
         setConsentChecked(true);
       });
-  }, [user]);
+  }, [user, location.pathname]);
 
   if (loading || !consentChecked) {
     return (
