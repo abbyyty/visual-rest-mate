@@ -17,6 +17,18 @@ const Consent = () => {
     setIsSubmitting(true);
 
     try {
+      // Check if consent already exists
+      const { data: existing } = await supabase
+        .from('consent_records')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        navigate('/');
+        return;
+      }
+
       const { error } = await supabase
         .from('consent_records')
         .insert({ user_id: user.id });
