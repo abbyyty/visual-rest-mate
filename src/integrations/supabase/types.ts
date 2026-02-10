@@ -19,16 +19,19 @@ export type Database = {
           consented_at: string
           id: string
           user_id: string
+          username: string | null
         }
         Insert: {
           consented_at?: string
           id?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           consented_at?: string
           id?: string
           user_id?: string
+          username?: string | null
         }
         Relationships: []
       }

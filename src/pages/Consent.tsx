@@ -8,7 +8,7 @@ import { Eye, FileText } from 'lucide-react';
 
 const Consent = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, username } = useAuth();
   const [agreed, setAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,20 +25,21 @@ const Consent = () => {
         .maybeSingle();
 
       if (existing) {
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
 
       const { error } = await supabase
         .from('consent_records')
-        .insert({ user_id: user.id });
+        .insert({ user_id: user.id, username: username || '' });
 
       if (error) {
         toast.error('Failed to save consent. Please try again.');
         console.error('Consent error:', error);
       } else {
         toast.success('Thank you! You can now use the app.');
-        navigate('/');
+        // Use window.location to force a full re-evaluation of auth/consent state
+        window.location.href = '/';
       }
     } finally {
       setIsSubmitting(false);
