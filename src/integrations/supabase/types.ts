@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      consent_records: {
-        Row: {
-          consented_at: string
-          id: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          consented_at?: string
-          id?: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          consented_at?: string
-          id?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
       daily_stats: {
         Row: {
           close_eyes_count: number

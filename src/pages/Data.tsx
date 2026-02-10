@@ -433,11 +433,7 @@ const Data = () => {
                 onClick={() => setShowAllDays(!showAllDays)}
                 className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
               >
-                {showAllDays
-                  ? 'Show less'
-                  : data.length >= 7
-                    ? 'Show the latest 7 days'
-                    : `Show ${data.length} days`}
+                {showAllDays ? 'Show less' : `Show ${Math.min(5, data.length)} days`}
               </button>
             )}
           </div>
@@ -458,7 +454,7 @@ const Data = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.slice(0, showAllDays ? 7 : 3).map((row) => (
+                  {data.slice(0, showAllDays ? 5 : 3).map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{formatDate(row.date)}</TableCell>
                       <TableCell>{formatInterval(row.daily_screen_time)}</TableCell>
