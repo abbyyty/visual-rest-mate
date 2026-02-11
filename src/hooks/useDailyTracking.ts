@@ -53,7 +53,7 @@ async function flushTrackingWrite(key: string) {
       if (!payload) continue;
 
       const { error } = await supabase
-        .from('daily_tracking')
+        .from('daily_summary')
         .upsert(payload, { onConflict: 'user_id,date' });
 
       if (error) devError('Error updating tracking:', error);
@@ -134,14 +134,14 @@ export function useDailyTracking() {
     try {
       // First check total days of use
       const { count } = await supabase
-        .from('daily_tracking')
+        .from('daily_summary')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
       
       const daysOfUse = (count ?? 0) + 1;
 
       const { data, error } = await supabase
-        .from('daily_tracking')
+        .from('daily_summary')
         .select('*')
         .eq('user_id', user.id)
         .eq('date', today)
