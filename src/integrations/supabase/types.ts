@@ -86,69 +86,6 @@ export type Database = {
         }
         Relationships: []
       }
-      daily_summary: {
-        Row: {
-          created_at: string
-          daily_overuse_time: unknown
-          daily_percentage_full_eye_close: number
-          daily_percentage_full_eye_exercise: number
-          daily_screen_time: unknown
-          daily_sessions_count: number
-          daily_sessions_eye_close: number
-          daily_sessions_eye_close_early_end: number
-          daily_sessions_eye_exercise: number
-          daily_sessions_eye_exercise_early_end: number
-          daily_sessions_skip: number
-          date: string
-          days_of_use: number
-          early_end_count: number
-          id: string
-          updated_at: string
-          user_id: string
-          username: string
-        }
-        Insert: {
-          created_at?: string
-          daily_overuse_time?: unknown
-          daily_percentage_full_eye_close?: number
-          daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
-          daily_sessions_count?: number
-          daily_sessions_eye_close?: number
-          daily_sessions_eye_close_early_end?: number
-          daily_sessions_eye_exercise?: number
-          daily_sessions_eye_exercise_early_end?: number
-          daily_sessions_skip?: number
-          date?: string
-          days_of_use?: number
-          early_end_count?: number
-          id?: string
-          updated_at?: string
-          user_id: string
-          username: string
-        }
-        Update: {
-          created_at?: string
-          daily_overuse_time?: unknown
-          daily_percentage_full_eye_close?: number
-          daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
-          daily_sessions_count?: number
-          daily_sessions_eye_close?: number
-          daily_sessions_eye_close_early_end?: number
-          daily_sessions_eye_exercise?: number
-          daily_sessions_eye_exercise_early_end?: number
-          daily_sessions_skip?: number
-          date?: string
-          days_of_use?: number
-          early_end_count?: number
-          id?: string
-          updated_at?: string
-          user_id?: string
-          username?: string
-        }
-        Relationships: []
-      }
       daily_tracking: {
         Row: {
           created_at: string
