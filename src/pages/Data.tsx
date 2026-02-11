@@ -96,7 +96,7 @@ const Data = () => {
 
     const fetchData = async () => {
       const { data: rows, error } = await supabase
-        .from('daily_tracking')
+        .from('daily_summary')
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: false })
