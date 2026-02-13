@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { devError } from '@/lib/logger';
+import { getHongKongDateString } from '@/lib/hongKongTime';
 
 interface DailyTrackingRow {
   id: string;
@@ -145,7 +146,7 @@ const Data = () => {
   if (!user) return null;
 
   // Get today's data for pie charts
-  const today = new Date().toISOString().split('T')[0];
+  const today = getHongKongDateString();
   const todayData = data.find(d => d.date === today);
 
   // Screen Time Pie Chart Data
