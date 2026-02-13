@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, Mail, Lock, User, LogIn, UserPlus } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Eye, Mail, Lock, User, LogIn, UserPlus, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -20,6 +21,19 @@ const Auth = () => {
   const [username, setUsername] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; username?: string }>({});
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkUsernameAvailability = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (trimmed.length < 2) {
+      setUsernameStatus('idle');
+      return;
+    }
+    setUsernameStatus('checking');
+    const { data } = await supabase.rpc('check_username_available', { desired_username: trimmed });
+    setUsernameStatus(data ? 'available' : 'taken');
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -55,6 +69,11 @@ const Auth = () => {
     e.preventDefault();
     
     if (!validateForm()) return;
+    
+    if (!isLogin && usernameStatus === 'taken') {
+      toast.error('Please choose a different username');
+      return;
+    }
     
     setIsSubmitting(true);
 
@@ -125,13 +144,29 @@ const Auth = () => {
                 id="username"
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setUsernameStatus('idle');
+                  if (debounceRef.current) clearTimeout(debounceRef.current);
+                  debounceRef.current = setTimeout(() => checkUsernameAvailability(e.target.value), 500);
+                }}
                 className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="Your username"
               />
-              {errors.username && (
-                <p className="text-destructive text-sm">{errors.username}</p>
-              )}
+              <div className="flex items-center gap-1 min-h-[20px]">
+                {usernameStatus === 'checking' && (
+                  <span className="text-muted-foreground text-sm flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Checking...</span>
+                )}
+                {usernameStatus === 'available' && (
+                  <span className="text-emerald-500 dark:text-emerald-400 text-sm flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Username available</span>
+                )}
+                {usernameStatus === 'taken' && (
+                  <span className="text-destructive text-sm flex items-center gap-1"><XCircle className="w-3 h-3" /> Username already taken</span>
+                )}
+                {errors.username && (
+                  <p className="text-destructive text-sm">{errors.username}</p>
+                )}
+              </div>
             </div>
           )}
 
