@@ -32,7 +32,7 @@ export default function Consent() {
         username: username ?? '',
         email: user.email ?? '',
         consent_given: true,
-        consent_text_version: 'v1',
+        consent_text_version: 'v2',
       } as any);
       window.location.href = '/';
     } catch {
@@ -51,19 +51,64 @@ export default function Consent() {
           <p>
             You are invited to participate in a pilot evaluation of an eye‑wellness browser
             designed to promote healthy screen‑use habits and reduce digital eye strain.
+            Please read the information below carefully before deciding whether to participate.
           </p>
+
           <p>
-            By agreeing to participate, you consent to: the anonymous collection of usage data
-            (e.g. frequency of use, completion of eye exercises, break adherence) and voluntary
-            questionnaire responses related to eye comfort, usability, and satisfaction.
+            The purpose of this pilot study is to evaluate the usability, effectiveness,
+            and user experience of the eye‑wellness browser.
           </p>
-          <p>The collected data will be used only for research, evaluation, and future development purposes, analysed in an anonymised and aggregated manner, and may be included in academic reports or publications, with no personally identifiable information disclosed.</p>
+
+          <p className="font-medium text-foreground">
+            If you agree to participate, you consent to:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>The anonymous collection of usage data (e.g. frequency of use, completion of eye exercises, break adherence)</li>
+            <li>Voluntary questionnaire responses related to eye comfort, usability, and satisfaction</li>
+          </ul>
+
+          <p>No medical diagnosis or treatment is provided as part of the study.</p>
+
+          <p className="font-medium text-foreground">The collected data will:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Be analysed in an anonymised and aggregated manner</li>
+            <li>Be stored securely and accessed only by the research team</li>
+            <li>Be used only for research, evaluation, and future development purposes</li>
+            <li>Potentially be included in academic reports or publications, without any personally identifiable information disclosed</li>
+          </ul>
+
+          <p>Data will be retained for 2 years and then securely deleted.</p>
+
+          <p>
+            This study involves minimal risk, comparable to normal screen use. There may be
+            no direct personal benefit to you, but your participation may help improve digital
+            wellness tools for future users.
+          </p>
+
           <p>
             Participation is entirely voluntary. You may withdraw at any time by discontinuing
-            use of the browser. This study involves minimal risk, comparable to normal screen use,
-            and does not involve medical diagnosis or treatment.
+            use of the browser.
           </p>
-          <p className="font-medium text-foreground">By proceeding, you confirm that:</p>
+
+          <p>
+            If you choose to withdraw, you may request deletion of your previously collected
+            data by contacting the research team at the email below (where feasible and before
+            data aggregation). Choosing not to participate or withdrawing will involve no penalty
+            or loss of benefits.
+          </p>
+
+          <p className="font-medium text-foreground">Eligibility</p>
+          <p>You must be 18 years of age or older to participate.</p>
+
+          <p className="font-medium text-foreground">Contact Information</p>
+          <p>
+            If you have any questions about this study, please contact:<br />
+            [Researcher Name]<br />
+            [Institution / Organisation]<br />
+            [Email Address]
+          </p>
+
+          <p className="font-medium text-foreground">By selecting the option below, you confirm that:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li>You are 18 years of age or older</li>
             <li>You have read and understood the information above</li>
