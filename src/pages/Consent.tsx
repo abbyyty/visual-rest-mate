@@ -103,9 +103,7 @@ export default function Consent() {
           <p className="font-medium text-foreground">Contact Information</p>
           <p>
             If you have any questions about this study, please contact:<br />
-            [Researcher Name]<br />
-            [Institution / Organisation]<br />
-            [Email Address]
+            eyedle.01@gmail.com
           </p>
 
           <p className="font-medium text-foreground">By selecting the option below, you confirm that:</p>
