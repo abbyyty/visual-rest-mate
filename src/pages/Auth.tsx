@@ -227,8 +227,8 @@ const Auth = () => {
           </button>
         </form>
 
-        {/* Toggle */}
-        <div className="text-center">
+        {/* Toggle & Forgot */}
+        <div className="text-center space-y-2">
           <button
             onClick={() => {
               setIsLogin(!isLogin);
@@ -238,6 +238,16 @@ const Auth = () => {
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
+          {isLogin && (
+            <div>
+              <button
+                onClick={() => navigate('/forgot-password')}
+                className="text-muted-foreground hover:text-primary text-sm hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
