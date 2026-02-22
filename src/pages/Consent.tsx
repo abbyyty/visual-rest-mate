@@ -26,18 +26,20 @@ export default function Consent() {
   const handleContinue = async () => {
     if (!agreed || submitting) return;
     setSubmitting(true);
-    try {
-      await supabase.from('consent_records').insert({
-        user_id: user.id,
-        username: username ?? '',
-        email: user.email ?? '',
-        consent_given: true,
-        consent_text_version: 'v2',
-      } as any);
-      window.location.href = '/';
-    } catch {
+    const { error } = await supabase.from('consent_records').upsert({
+      user_id: user.id,
+      username: username ?? '',
+      email: user.email ?? '',
+      consent_given: true,
+      consent_text_version: 'v2',
+    } as any, { onConflict: 'user_id' });
+    if (error) {
+      console.error('Consent insert failed:', error);
       setSubmitting(false);
+      return;
     }
+    console.log('Consent v2 saved → navigating');
+    window.location.href = '/';
   };
 
   return (
