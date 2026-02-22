@@ -40,12 +40,16 @@ const ForgotPassword = () => {
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('reset-password', {
+      const response = await supabase.functions.invoke('reset-password', {
         body: { username: username.trim(), email: email.trim(), new_password: newPassword },
       });
 
-      if (error || !data?.success) {
-        toast.error(data?.error || 'Failed to reset password. Please check your details.');
+      if (response.error) {
+        // Parse error from edge function response
+        const errorMsg = response.data?.error || 'Failed to reset password. Please check your details.';
+        toast.error(errorMsg);
+      } else if (!response.data?.success) {
+        toast.error(response.data?.error || 'Failed to reset password. Please check your details.');
       } else {
         toast.success('Password reset successful. Please log in with your new password.');
         navigate('/auth');
