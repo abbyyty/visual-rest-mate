@@ -21,8 +21,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     let cancelled = false;
     supabase
       .from('consent_records')
-      .select('id')
+      .select('consent_text_version, consent_given')
       .eq('user_id', user.id)
+      .eq('consent_text_version', 'v2')
+      .eq('consent_given', true)
       .maybeSingle()
       .then(({ data }) => {
         if (!cancelled) {
