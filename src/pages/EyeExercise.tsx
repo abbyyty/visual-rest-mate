@@ -71,7 +71,7 @@ const EyeExercise = () => {
   const [dotPosition, setDotPosition] = useState({ x: 50, y: 50 });
   const [isComplete, setIsComplete] = useState(false);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const settingsRef = useRef(getUserSettings());
   const ballSizeRef = useRef(getBallSize());
 

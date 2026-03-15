@@ -127,7 +127,7 @@ const Index = () => {
   const pausedElapsedRef = useRef<number>(0); // accumulated seconds before current running segment
 
   // Notification timeout ref for background break alerts
-  const notifTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const notifTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-start from exercise or relax navigation
   const autoStartTriggeredRef = useRef(false);
