@@ -231,7 +231,6 @@ const Auth = () => {
               )}
             </div>
           )}
-          </div>
 
           <button
             type="submit"
