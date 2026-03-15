@@ -49,13 +49,17 @@ const Auth = () => {
       if (isLogin) {
         authSchema.pick({ email: true, password: true }).parse({ email, password });
       } else {
-        authSchema.parse({ email, password, username });
+        authSchema.parse({ email, password, confirmPassword, username });
+        if (password !== confirmPassword) {
+          setErrors({ confirmPassword: 'Passwords do not match' });
+          return false;
+        }
       }
       setErrors({});
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: { email?: string; password?: string; username?: string } = {};
+        const newErrors: { email?: string; password?: string; confirmPassword?: string; username?: string } = {};
         error.errors.forEach(err => {
           if (err.path[0]) {
             newErrors[err.path[0] as keyof typeof newErrors] = err.message;
