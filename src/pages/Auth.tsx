@@ -9,6 +9,7 @@ import { z } from 'zod';
 const authSchema = z.object({
   email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
   password: z.string().min(6, 'Password must be at least 6 characters').max(72, 'Password too long'),
+  confirmPassword: z.string().optional(),
   username: z.string().trim().min(2, 'Username must be at least 2 characters').max(50, 'Username too long').optional()
 });
 
@@ -19,8 +20,9 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; username?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string; username?: string }>({});
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,13 +49,17 @@ const Auth = () => {
       if (isLogin) {
         authSchema.pick({ email: true, password: true }).parse({ email, password });
       } else {
-        authSchema.parse({ email, password, username });
+        authSchema.parse({ email, password, confirmPassword, username });
+        if (password !== confirmPassword) {
+          setErrors({ confirmPassword: 'Passwords do not match' });
+          return false;
+        }
       }
       setErrors({});
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: { email?: string; password?: string; username?: string } = {};
+        const newErrors: { email?: string; password?: string; confirmPassword?: string; username?: string } = {};
         error.errors.forEach(err => {
           if (err.path[0]) {
             newErrors[err.path[0] as keyof typeof newErrors] = err.message;
@@ -205,6 +211,26 @@ const Auth = () => {
               <p className="text-destructive text-sm">{errors.password}</p>
             )}
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm text-muted-foreground flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="••••••••"
+              />
+              {errors.confirmPassword && (
+                <p className="text-destructive text-sm">{errors.confirmPassword}</p>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

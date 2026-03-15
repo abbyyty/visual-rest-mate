@@ -89,10 +89,10 @@ export type Database = {
       daily_summary: {
         Row: {
           created_at: string
-          daily_overuse_time: unknown
+          daily_overuse_time: string
           daily_percentage_full_eye_close: number
           daily_percentage_full_eye_exercise: number
-          daily_screen_time: unknown
+          daily_screen_time: string
           daily_sessions_count: number
           daily_sessions_eye_close: number
           daily_sessions_eye_close_early_end: number
@@ -109,10 +109,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          daily_overuse_time?: unknown
+          daily_overuse_time?: string
           daily_percentage_full_eye_close?: number
           daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
+          daily_screen_time?: string
           daily_sessions_count?: number
           daily_sessions_eye_close?: number
           daily_sessions_eye_close_early_end?: number
@@ -129,10 +129,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          daily_overuse_time?: unknown
+          daily_overuse_time?: string
           daily_percentage_full_eye_close?: number
           daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
+          daily_screen_time?: string
           daily_sessions_count?: number
           daily_sessions_eye_close?: number
           daily_sessions_eye_close_early_end?: number
@@ -152,10 +152,10 @@ export type Database = {
       daily_tracking: {
         Row: {
           created_at: string
-          daily_overuse_time: unknown
+          daily_overuse_time: string
           daily_percentage_full_eye_close: number
           daily_percentage_full_eye_exercise: number
-          daily_screen_time: unknown
+          daily_screen_time: string
           daily_sessions_count: number
           daily_sessions_eye_close: number
           daily_sessions_eye_close_early_end: number
@@ -171,10 +171,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          daily_overuse_time?: unknown
+          daily_overuse_time?: string
           daily_percentage_full_eye_close?: number
           daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
+          daily_screen_time?: string
           daily_sessions_count?: number
           daily_sessions_eye_close?: number
           daily_sessions_eye_close_early_end?: number
@@ -190,10 +190,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          daily_overuse_time?: unknown
+          daily_overuse_time?: string
           daily_percentage_full_eye_close?: number
           daily_percentage_full_eye_exercise?: number
-          daily_screen_time?: unknown
+          daily_screen_time?: string
           daily_sessions_count?: number
           daily_sessions_eye_close?: number
           daily_sessions_eye_close_early_end?: number
