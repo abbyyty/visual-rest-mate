@@ -212,6 +212,27 @@ const Auth = () => {
             )}
           </div>
 
+          {!isLogin && (
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm text-muted-foreground flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="••••••••"
+              />
+              {errors.confirmPassword && (
+                <p className="text-destructive text-sm">{errors.confirmPassword}</p>
+              )}
+            </div>
+          )}
+          </div>
+
           <button
             type="submit"
             disabled={isSubmitting}
