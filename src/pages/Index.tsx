@@ -118,7 +118,7 @@ const Index = () => {
   const [showBlackScreen, setShowBlackScreen] = useState(false);
   const [sessionOveruseSeconds, setSessionOveruseSeconds] = useState(0);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
   const lastDingTimeRef = useRef(0);
 
