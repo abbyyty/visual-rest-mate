@@ -105,13 +105,13 @@ export function SettingsModal() {
               <Slider
                 value={[settings.breakIntervalMinutes]}
                 onValueChange={(values) => setSettings(prev => ({ ...prev, breakIntervalMinutes: values[0] }))}
-                min={1}
+                min={15}
                 max={30}
                 step={1}
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 min (testing)</span>
+                <span>15 min</span>
                 <span>30 min</span>
               </div>
             </div>
