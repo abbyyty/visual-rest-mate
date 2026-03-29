@@ -4,10 +4,12 @@ import { devError } from './logger';
 
 const SpeedSettingSchema = z.enum(['slow', 'normal', 'fast']);
 const SizeSettingSchema = z.enum(['small', 'medium', 'large']);
+const BrightnessSettingSchema = z.enum(['dim', 'normal', 'bright']);
 
 const UserSettingsSchema = z.object({
   breakIntervalMinutes: z.number().min(1).max(120),
   ballSize: SizeSettingSchema,
+  ballBrightness: BrightnessSettingSchema.default('normal'),
   speeds: z.object({
     vertical: SpeedSettingSchema,
     horizontal: SpeedSettingSchema,
@@ -19,10 +21,12 @@ const UserSettingsSchema = z.object({
 
 export type SpeedSetting = z.infer<typeof SpeedSettingSchema>;
 export type SizeSetting = z.infer<typeof SizeSettingSchema>;
+export type BrightnessSetting = z.infer<typeof BrightnessSettingSchema>;
 
 export interface UserSettings {
   breakIntervalMinutes: number;
   ballSize: SizeSetting;
+  ballBrightness: BrightnessSetting;
   speeds: {
     vertical: SpeedSetting;
     horizontal: SpeedSetting;
@@ -50,9 +54,17 @@ export const SPEED_VALUES = {
 
 const STORAGE_KEY = 'userSettings';
 
+// Brightness opacity values
+export const BRIGHTNESS_VALUES = {
+  dim: 0.4,
+  normal: 0.7,
+  bright: 1.0,
+};
+
 export const DEFAULT_SETTINGS: UserSettings = {
   breakIntervalMinutes: 30,
   ballSize: 'medium',
+  ballBrightness: 'normal',
   speeds: {
     vertical: 'normal',
     horizontal: 'normal',
@@ -106,4 +118,8 @@ export function getSpeedValue(exercise: keyof typeof SPEED_VALUES, setting: Spee
 
 export function getBallSize(): number {
   return SIZE_VALUES[getUserSettings().ballSize];
+}
+
+export function getBallBrightness(): number {
+  return BRIGHTNESS_VALUES[getUserSettings().ballBrightness];
 }

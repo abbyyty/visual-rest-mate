@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { ExerciseDot } from '@/components/ExerciseDot';
 import { formatMinutesSeconds } from '@/lib/userId';
 import { playStartSound, playOpenEyesSound, playEndSound } from '@/lib/sound';
-import { getUserSettings, getSpeedValue, getBallSize } from '@/lib/settings';
+import { getUserSettings, getSpeedValue, getBallSize, getBallBrightness } from '@/lib/settings';
 import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { Button } from '@/components/ui/button';
 
@@ -313,7 +313,7 @@ const EyeExercise = () => {
         {/* Dot container */}
         {currentPhase?.showDot && (
           <div className="absolute inset-0 m-8">
-            <ExerciseDot x={dotPosition.x} y={dotPosition.y} size={ballSizeRef.current} />
+            <ExerciseDot x={dotPosition.x} y={dotPosition.y} size={ballSizeRef.current} brightness={getBallBrightness()} />
           </div>
         )}
 

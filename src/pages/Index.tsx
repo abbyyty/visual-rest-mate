@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Eye, Moon, SkipForward, Play, Activity, AlertCircle, Flame, Pause, RotateCcw, BarChart3, LogOut } from 'lucide-react';
+import { Eye, Moon, SkipForward, Play, Activity, AlertCircle, Flame, Pause, RotateCcw, BarChart3, LogOut, Mail } from 'lucide-react';
 import { getTodayDate, formatTime, formatMinutesSeconds } from '@/lib/userId';
 import { useDailyTracking } from '@/hooks/useDailyTracking';
 import { StatCard } from '@/components/StatCard';
@@ -695,6 +695,13 @@ const Index = () => {
               <BarChart3 className="w-4 h-4" />
               View My Data
             </Link>
+            <a
+              href="mailto:eyedle.01@gmail.com"
+              className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2"
+              title="Contact us: eyedle.01@gmail.com"
+            >
+              <Mail className="w-4 h-4" />
+            </a>
             <button
               onClick={handleSignOut}
               className="text-muted-foreground hover:text-destructive transition-colors flex items-center gap-2"
