@@ -7,7 +7,7 @@ const SizeSettingSchema = z.enum(['small', 'medium', 'large']);
 const BrightnessSettingSchema = z.enum(['dim', 'normal', 'bright']);
 
 const UserSettingsSchema = z.object({
-  breakIntervalMinutes: z.number().min(1).max(120),
+  breakIntervalMinutes: z.number().min(15).max(30),
   ballSize: SizeSettingSchema,
   ballBrightness: BrightnessSettingSchema.default('normal'),
   speeds: z.object({
@@ -62,7 +62,7 @@ export const BRIGHTNESS_VALUES = {
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
-  breakIntervalMinutes: 30,
+  breakIntervalMinutes: 15,
   ballSize: 'medium',
   ballBrightness: 'normal',
   speeds: {
