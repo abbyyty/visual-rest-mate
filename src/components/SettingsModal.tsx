@@ -4,13 +4,16 @@ import { Settings } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS, SizeSetting, SIZE_VALUES } from '@/lib/settings';
+import { getUserSettings, saveUserSettings, UserSettings, DEFAULT_SETTINGS, SizeSetting, SIZE_VALUES, BrightnessSetting, BRIGHTNESS_VALUES } from '@/lib/settings';
 
 type SpeedValue = 'slow' | 'normal' | 'fast';
 const SPEED_OPTIONS: SpeedValue[] = ['slow', 'normal', 'fast'];
 
 type SizeValue = 'small' | 'medium' | 'large';
 const SIZE_OPTIONS: SizeValue[] = ['small', 'medium', 'large'];
+
+type BrightnessValue = 'dim' | 'normal' | 'bright';
+const BRIGHTNESS_OPTIONS: BrightnessValue[] = ['dim', 'normal', 'bright'];
 
 function SpeedSlider({ 
   label, 
@@ -146,6 +149,44 @@ export function SettingsModal() {
                 <span>Small</span>
                 <span>Medium</span>
                 <span>Large</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Brightness Settings */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Brightness of Ball
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm text-foreground">Brightness</Label>
+                  {/* Brightness preview */}
+                  <div 
+                    className="bg-white rounded-full"
+                    style={{
+                      width: `${SIZE_VALUES[settings.ballSize]}px`,
+                      height: `${SIZE_VALUES[settings.ballSize]}px`,
+                      opacity: BRIGHTNESS_VALUES[settings.ballBrightness],
+                      boxShadow: `0 0 ${10 * BRIGHTNESS_VALUES[settings.ballBrightness]}px rgba(255,255,255,${BRIGHTNESS_VALUES[settings.ballBrightness] * 0.6})`,
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-mono text-primary capitalize">{settings.ballBrightness}</span>
+              </div>
+              <Slider
+                value={[BRIGHTNESS_OPTIONS.indexOf(settings.ballBrightness)]}
+                onValueChange={(values) => setSettings(prev => ({ ...prev, ballBrightness: BRIGHTNESS_OPTIONS[values[0]] as BrightnessSetting }))}
+                min={0}
+                max={2}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Dim</span>
+                <span>Normal</span>
+                <span>Bright</span>
               </div>
             </div>
           </section>
